@@ -11,6 +11,7 @@ import Activity from "@/pages/Activity";
 import Staff from "@/pages/Staff";
 import SunroomDemo from "@/pages/SunroomDemo";
 import SessionLocationDemo from "@/pages/SessionLocationDemo";
+import ScanProgressDemo from "@/pages/ScanProgressDemo";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
       {/* Ungated previews — standalone mocks, do not touch the live login/theme/inventory flows. */}
       <Route path="/demo/sunroom" element={<SunroomDemo />} />
       <Route path="/demo/session-location" element={<SessionLocationDemo />} />
+      <Route path="/demo/scan-progress" element={<ScanProgressDemo />} />
 
       {/* Forest Thrift Vision shell — Home / Scan / Finds / More */}
       <Route

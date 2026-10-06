@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import CameraCapture from "@/components/CameraCapture";
+import ProcessingSteps from "@/components/common/ProcessingSteps";
 import { apiPost } from "@/lib/api";
 import { gbp, CATEGORIES, LOCATIONS, sizeOptionsFor, CONDITION_OPTIONS, CONDITION_MULTIPLIERS, adjustedCharityPrice } from "@/lib/types";
 import { getSessionLocation, useSessionLocation } from "@/lib/sessionLocation";
@@ -412,10 +413,8 @@ export default function Appraise() {
         <h2 className="display-title mt-3 text-2xl text-foreground">Valuation</h2>
 
         {appraise.isPending && (
-          <div className="mt-7 space-y-3" data-testid="appraisal-loading">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-16 rounded-lg border border-hairline bg-charcoal animate-sweep" />
-            ))}
+          <div className="mt-7" data-testid="appraisal-loading">
+            <ProcessingSteps active={appraise.isPending} testid="scan-progress" />
           </div>
         )}
 
