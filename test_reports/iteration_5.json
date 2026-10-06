@@ -1,0 +1,76 @@
+{
+  "iteration": 5,
+  "summary": "Verified the 5-criterion condition-edit/re-price acceptance matrix (condition-only edit suppresses the guide line, Re-price from condition recomputes & restores it, manual price edit suppresses it, all 7 condition grades selectable/persist, and edits survive reload + propagate to the inventory grid) with new backend test file + 5 new named browser checks, plus one re-run through the public preview URL. All 5 criteria passed on both lanes where applicable; no application bugs found.",
+  "passed": 10,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, out-of-scope test_tscheck_appraise_endpoint.py has 2 failures unrelated to this iteration's matrix: (1) anonymous POST /api/appraise now returns 401 instead of the test's expected 403 (CSRF-guard-vs-auth-order likely changed in a prior unrelated change), (2) missing fixture image at /tmp/item.jpg. Neither touches condition/price_source/edit-dialog behavior; left unmodified per scope, flagging for a future iteration."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Backend: condition-only PATCH leaves recommended_price and price_source untouched",
+      "name": "tests/test_tscheck_condition_edit_pricing.py::test_condition_only_edit_does_not_touch_price_or_source",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/inventory -> 201 {recommended_price:20.0, price_source:'charity'}; PATCH {condition:'Fair'} -> 200 {condition:'Fair', recommended_price:20.0, price_source:'charity'} unchanged"
+    },
+    {
+      "criterion": "Condition-only edit does not leave a misleading guide line on the tag",
+      "name": "condition-only-edit-no-misleading-guide-line",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck item (peak 100, avg 40, Good/34/charity) via API, opened /tag/{id} -> tag-condition showed 'priced at 85% of guide'. Edit dialog: changed Condition to Fair WITHOUT tapping Re-price, Save. tag-condition now contains 'Fair' with no 'priced at ... of guide' text; tag-price unchanged (£34.00 before and after). Re-ran once more against the public preview URL — passed"
+    },
+    {
+      "criterion": "Backend: a Re-price-from-condition-style PATCH (condition + recomputed price + price_source=charity) persists all three fields",
+      "name": "tests/test_tscheck_condition_edit_pricing.py::test_reprice_from_condition_persists_new_price_and_charity_source",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PATCH {condition:'Fair', recommended_price:26.0, price_source:'charity'} -> 200 {condition:'Fair', recommended_price:26.0, price_source:'charity'} (guide base round(min(40,50)*2)/2=40, 40*0.65 rounded to 50p = 26, matching frontend charityGuidePrice/adjustedCharityPrice formula)"
+    },
+    {
+      "criterion": "Re-price from condition recomputes the price and restores the guide line",
+      "name": "reprice-from-condition-restores-guide-line",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same fixture item; opened Edit, selected Fair, tapped reprice-from-condition -> edit-price-input changed from '34' to '26' (matches the 65% Fair multiplier of the 40 guide base). Saved -> tag-condition shows 'priced at 65% of guide', tag-price shows '26'"
+    },
+    {
+      "criterion": "Backend: manual price PATCH with price_source=custom persists as custom",
+      "name": "tests/test_tscheck_condition_edit_pricing.py::test_manual_price_edit_sets_custom_source",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PATCH {recommended_price:17.5, price_source:'custom'} -> 200 {recommended_price:17.5, price_source:'custom'}"
+    },
+    {
+      "criterion": "Manual price edit suppresses the guide line",
+      "name": "manual-price-edit-suppresses-guide-line",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened Edit on fixture item, typed '19.50' directly into edit-price-input (no condition change), Save. tag-price shows '19.50'; tag-condition text has no 'priced at ... of guide' substring"
+    },
+    {
+      "criterion": "Backend: all 7 condition grades accepted/persist; unknown grade rejected",
+      "name": "tests/test_tscheck_condition_edit_pricing.py::test_all_seven_condition_grades_accepted_and_persist + test_unknown_condition_grade_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Looped PATCH {condition:g} for all 7 grades -> 200 each, final GET /api/inventory/{id} -> condition:'Poor/for repair'; PATCH {condition:'Mint-ish ish'} -> 422 'Unknown condition'"
+    },
+    {
+      "criterion": "Expanded 7-grade condition list is selectable in the edit dialog",
+      "name": "expanded-condition-list-all-seven-grades-selectable",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Edit dialog Condition dropdown: cycled through all 7 edit-condition-* options (New with tags, New without tags, Excellent, Very good, Good, Fair, Poor/for repair), each selection reflected in the trigger label; Save persisted 'Poor/for repair' in the Item record's Condition row"
+    },
+    {
+      "criterion": "Edit changes persist after reload",
+      "name": "condition-edit-persists-after-reload-and-inventory-grid",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Set condition to 'Very good' and saved; Item record row showed 'Very good'. Hard page.reload() of /tag/{id} -> still shows 'Very good'. Navigated to Inventory via nav-inventory -> inventory-item-{id} card text also contains 'Very good' without a manual refresh (TanStack Query cache invalidated on save)"
+    }
+  ]
+}

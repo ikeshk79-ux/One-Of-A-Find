@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Apply the saved colour scheme before first paint to avoid a flash of the wrong theme.
+      try {
+        if (localStorage.getItem('ooaf-theme') === 'sunroom') {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('theme-sunroom');
+        }
+      } catch (err) { /* ignore */ }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B0C0E" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="One Of A Find" />
+    <meta name="description" content="One Of A Find — AI appraisal terminal for charity shops: identify donated items, find their peak retail price, and set an elevated charity resale price to maximise fundraising." />
+    <title>One Of A Find — Charity Shop Appraisal</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

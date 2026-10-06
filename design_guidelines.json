@@ -1,0 +1,215 @@
+{
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#0B0C0E",
+        "on_bg": "#F5F5F7",
+        "on_bg_muted": "#8E929B",
+        "roles": {
+          "link": "#E4C5A5",
+          "error": "#FF6B6B",
+          "success": "#4EBA87",
+          "warning": "#F5A623",
+          "gold_highlight": "#D9B48F"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#16181C",
+        "on_bg": "#F5F5F7",
+        "on_bg_muted": "#9A9EA7",
+        "roles": {
+          "border": "#272A30",
+          "border_glow": "rgba(217,180,143,0.22)",
+          "gold_metric": "#D9B48F",
+          "accent_badge_bg": "#2A231C",
+          "accent_badge_text": "#E8CAA9"
+        }
+      },
+      {
+        "name": "card_subtle",
+        "kind": "solid",
+        "bg": "#1D2026",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#A2A7B0"
+      },
+      {
+        "name": "inverse_tag_print",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0B0C0E",
+        "on_bg_muted": "#555A64",
+        "roles": {
+          "border": "#000000",
+          "barcode_fill": "#000000",
+          "price_accent": "#0B0C0E"
+        }
+      },
+      {
+        "name": "modal_overlay",
+        "kind": "solid",
+        "bg": "#0B0C0EE6",
+        "on_bg": "#F5F5F7",
+        "on_bg_muted": "#8E929B"
+      },
+      {
+        "name": "hero",
+        "kind": "image",
+        "contrast_against": "#101216",
+        "guarantee": "scrim: linear-gradient(180deg, rgba(11,12,14,0.88) 0%, rgba(11,12,14,0.97) 100%)",
+        "on_bg": "#F5F5F7",
+        "on_bg_muted": "#9A9EA7",
+        "roles": {
+          "link": "#E4C5A5",
+          "error": "#FF6B6B",
+          "success": "#4EBA87"
+        }
+      }
+    ],
+    "accent": "#D9B48F",
+    "on_accent": "#0B0C0E",
+    "accent_secondary": "#B8936E",
+    "border_obsidian": "#23262D",
+    "glow_radial": "radial-gradient(circle at 50% 0%, rgba(217, 180, 143, 0.15) 0%, transparent 70%)"
+  },
+  "typography": {
+    "font_family_heading": "Space Grotesk Variable, sans-serif",
+    "font_family_body": "Geist Variable, sans-serif",
+    "font_family_mono": "Geist Mono Variable, monospace",
+    "scale_px": {
+      "display": 52,
+      "h1": 40,
+      "h2": 32,
+      "h3": 24,
+      "body": 16,
+      "caption": 14
+    },
+    "letter_spacing": {
+      "display": "-0.03em",
+      "h1": "-0.02em",
+      "labels": "0.18em",
+      "currency_large": "-0.02em"
+    }
+  },
+  "entry_surfaces": {
+    "/": "split hero appraisal scanner — brand ethos + quick-passcode unlock and instant dual-capture launcher left, live inventory highlights & elevated returns ticker right",
+    "/login": "obsidian vault lockscreen — single shared shop passcode entry with numeric keypad support, shop ID selector, and quick emergency bypass hint",
+    "/appraise": "dual-lens capture studio — camera/file upload for item & brand label with instant AI computer vision telemetry breakdown and elevated price calculator",
+    "/inventory": "charity ledger bento table — filterable inventory list, status trackers, elevated margin indicators, and bulk printable tag drawer",
+    "/print-tag": "high-contrast printable tag view — thermal / standard label sheet preview with working SVG barcode (Code128) and live QR code with item verification link"
+  },
+  "visual_enhancers": {
+    "theme": "Obsidian Appraisal (Cinematic Dark Luxury)",
+    "texture": "Subtle 1px gold hairline inset borders (0 0 0 1px rgba(217,180,143,0.18)), velvet obsidian depth, and gentle radial backlights on action cards",
+    "tag_print_styling": "True monochrome print-ready CSS (@media print { body { background: white !important; color: black !important; } }) ensuring thermal label & standard A4 sheet crispness",
+    "currency_symbol": "£ (GBP - United Kingdom Charity Shop Standard)"
+  },
+  "motion": {
+    "camera_shutter_feedback": "Quick haptic scale bounce (scale 0.97 to 1.0) with subtle gold strobe pulse on image drop or capture",
+    "price_elevation_odometer": "Animated number counter smoothly calculating the +15% charity uplift with gold highlight glow",
+    "drawer_transitions": "Spring easing (stiffness 280, damping 26) for printable tag drawer & inventory side-sheet",
+    "reduced_motion_rule": "prefers-reduced-motion respected on all transitions with instant opacity fallback"
+  },
+  "accessibility": {
+    "apca_contrast": "All text tokens exceed 4.5:1 on their declared background surfaces. Gold highlight #D9B48F on #16181C yields > 7:1 contrast",
+    "touch_targets": "Minimum 48px on all mobile touch triggers (upload buttons, passcode keypad, print CTA, search filters)",
+    "screen_reader": "Descriptive aria-labels on camera capture inputs, appraisal confidence bars, and barcode verification regions",
+    "keyboard_nav": "Full arrow key and number key support for passcode pin entry and appraisal field edits"
+  },
+  "grids_and_layouts": {
+    "mobile_first": "Tailored for volunteer phones/tablets in-store with sticky bottom appraisal actions and thumb-friendly capture zone",
+    "desktop_bento": "8-col / 12-col asymmetric grid for desktop management (Camera left col-span-5, real-time AI valuation telemetry right col-span-7)"
+  },
+  "image_urls": {
+    "clothing_labels": [
+      {
+        "url": "https://images.unsplash.com/photo-1579980939549-733d6bef18a1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwbHV4dXJ5JTIwamFja2V0JTIwY2xvdGhpbmclMjBsYWJlbHxlbnwwfHx8fDE3ODk3NTUzMzB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Vintage luxury leather jacket showing stitching and grain - hero sample item",
+        "category": "sample_appraisals"
+      },
+      {
+        "url": "https://images.pexels.com/photos/17223719/pexels-photo-17223719.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Designer blazer lining and authentic garment maker label",
+        "category": "label_samples"
+      }
+    ],
+    "watches_and_jewelry": [
+      {
+        "url": "https://images.unsplash.com/photo-1524805444758-089113d48a6d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwxfHxhbnRpcXVlJTIwbHV4dXJ5JTIwd2F0Y2glMjBqZXdlbHJ5JTIwdmludGFnZXxlbnwwfHx8fDE3ODk3NTUzMzB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Vintage Swiss chronograph watch with leather strap on dark background",
+        "category": "sample_appraisals"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1747995525955-92010650c3ae?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHw0fHxhbnRpcXVlJTIwbHV4dXJ5JTIwd2F0Y2glMjBqZXdlbHJ5JTIwdmludGFnZXxlbnwwfHx8fDE3ODk3NTUzMzB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Luxury timepiece on textured dark surface with authentic brand markings",
+        "category": "sample_appraisals"
+      }
+    ],
+    "designer_bags": [
+      {
+        "url": "https://images.unsplash.com/photo-1691480150204-66dd1eb77391?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwzfHx2aW50YWdlJTIwbGVhdGhlciUyMGRlc2lnbmVyJTIwaGFuZGJhZ3xlbnwwfHx8fDE3ODk3NTUzMzB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Vintage luxury leather satchel handbag with brass hardware",
+        "category": "sample_appraisals"
+      },
+      {
+        "url": "https://images.pexels.com/photos/27137636/pexels-photo-27137636.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Exquisitely crafted vintage leather shoulder bag with embossed detailing",
+        "category": "sample_appraisals"
+      }
+    ]
+  },
+  "component_structure": {
+    "app_name": "One Of A Find",
+    "tagline": "AI Vision Appraisal & Elevated Second-Hand Pricing for Charity Shops",
+    "currency": "GBP (£)",
+    "key_components": [
+      {
+        "name": "PasscodeGateModal",
+        "path": "frontend/src/components/PasscodeGateModal.tsx",
+        "purpose": "Shared single shop passcode lockscreen (e.g. 'FIND2026' or 'CHARITY123') with quick numpad, remember-session toggle, and smooth unlock reveal"
+      },
+      {
+        "name": "DualCaptureUploader",
+        "path": "frontend/src/components/DualCaptureUploader.tsx",
+        "purpose": "Mobile-optimized dual-slot image uploader: Slot 1 (Item overview photo) + Slot 2 (Brand tag / hallmark / label photo) with sample preset buttons for rapid testing"
+      },
+      {
+        "name": "AppraisalResultCard",
+        "path": "frontend/src/components/AppraisalResultCard.tsx",
+        "purpose": "Cinematic appraisal dossier showing item recognition, brand identification, condition rating, peak historical retail price, second-hand market average, and the highlighted elevated charity price (+15% formula) with breakdown explanation"
+      },
+      {
+        "name": "PrintablePriceTag",
+        "path": "frontend/src/components/PrintablePriceTag.tsx",
+        "purpose": "Printable charity tag generator featuring rendered Barcode (SVG Code128 / standard format), live QR Code (linking to public verification/story page), item title, SKU/ID, donor impact note, and prominent price"
+      },
+      {
+        "name": "InventoryLedger",
+        "path": "frontend/src/components/InventoryLedger.tsx",
+        "purpose": "Full charity inventory table with quick search, category filters, total elevated funds generated metric, export option, and tag reprint triggers"
+      },
+      {
+        "name": "AppHeader",
+        "path": "frontend/src/components/AppHeader.tsx",
+        "purpose": "Obsidian crystal header with 'One Of A Find' luxury badge, shop branch indicator, online status, passcode lock toggle, and navigation tabs"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Use deep obsidian dark theme (#0B0C0E) with charcoal surface panels (#16181C) and warm luminous gold highlights (#D9B48F). Ensure 1px subtle gold borders and glow effects.",
+    "Implement the single shared password for the charity shop (default e.g. 'CHARITY2026' or 'VINTAGE2026') stored in localStorage/session so volunteers can work seamlessly.",
+    "Dual photo capture: Allow uploading or taking photo of item + photo of brand label. Provide pre-seeded sample buttons (e.g. 'Vintage Barbour Jacket', 'Omega Seamaster', 'Mulberry Handbag', 'Burberry Trench') for instant one-click appraisal simulation.",
+    "AI Appraisal calculation: Calculate Peak Retail Price (£), Second-Hand Market Average (£), and Elevated Charity Price = Market Average * 1.15 (+15% uplift). Show the charity gain (£ extra raised for the cause).",
+    "Generate genuine working Barcode and QR Code on the printable tag (use jsbarcode or svg barcode representation, and qrcode.react / svg QR generator) so tags look authentic and are printable via window.print() or download as tag.",
+    "Support United Kingdom locale formatting: £ currency symbol, British date formats (DD/MM/YYYY), and volunteer-friendly language.",
+    "Include data-testid on every interactive button, input, passcode field, tab, tag print button, and metric card."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": {
+    "aesthetic": "Obsidian dark luxury appraisal, razor-sharp typography, warm gold accents, non-generic layout, tactile card depths with 1px border glows",
+    "performance": "Instant client responsiveness with optimistic UI updates and robust fallback sample appraisals for offline CDN preview resilience",
+    "testing": "All elements equipped with data-testid attributes (e.g. data-testid='passcode-input', data-testid='appraise-btn', data-testid='print-tag-btn')"
+  }
+}

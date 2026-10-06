@@ -1,0 +1,109 @@
+{
+  "iteration": 1,
+  "summary": "14 checks executed (6 backend, 8 browser) covering all 8 acceptance-matrix criteria. All passed. No bugs found.",
+  "passed": 14,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Shared-password login works",
+      "name": "test_tscheck_auth_and_inventory.py::test_login_with_correct_password_succeeds",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login {password: charity2026} -> 200 {authenticated: true}"
+    },
+    {
+      "criterion": "Shared-password login works (wrong password rejected)",
+      "name": "test_tscheck_auth_and_inventory.py::test_login_with_wrong_password_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login {password: wrong-pass} -> 401"
+    },
+    {
+      "criterion": "Shared-password login works",
+      "name": "login-unlocks-appraise-page",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filled shop-password-input, clicked unlock-button, item-photo-slot and label-photo-slot visible on Appraise page after login"
+    },
+    {
+      "criterion": "Inventory loads with stats and items after login",
+      "name": "test_tscheck_auth_and_inventory.py::test_inventory_and_stats_require_and_return_after_auth",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Unauthed GET /api/inventory -> 401; after login GET /api/inventory -> 200 list>=1; GET /api/inventory/stats -> 200 with total_items/available_items/sold_items/all_time_raised/potential_value"
+    },
+    {
+      "criterion": "Inventory loads with stats and items after login",
+      "name": "inventory-loads-with-stats-and-items",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "GET /api/inventory and /api/inventory/stats returned 200 on nav to Inventory; stats-grid + 4 stat cards visible; inventory-list rendered with >0 inventory-item-* cards"
+    },
+    {
+      "criterion": "Sort options reorder the inventory grid",
+      "name": "inventory-sort-reorders-grid",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "price-desc: card prices non-increasing; price-asc: non-decreasing; category sort: displayed title order matched API-computed category+title ordering"
+    },
+    {
+      "criterion": "Category and availability filters work",
+      "name": "inventory-category-and-availability-filters",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Category filter narrowed card count to match API-side category count; availability=sold showed only sold-badge-* cards matching API sold count; availability=available showed 0 sold badges matching API available count"
+    },
+    {
+      "criterion": "Scan tag looks up by SKU and opens the item",
+      "name": "test_tscheck_scan_sku_lookup.py::test_lookup_unknown_sku_returns_404",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/inventory/lookup?sku=000000000000 -> 404 {detail: No item with that barcode}"
+    },
+    {
+      "criterion": "Scan tag looks up by SKU and opens the item",
+      "name": "test_tscheck_scan_sku_lookup.py::test_lookup_known_sku_returns_200_and_matches_created_item",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/inventory -> 201 with 12-digit sku; GET /api/inventory/lookup?sku=<sku> -> 200 matching created id/title"
+    },
+    {
+      "criterion": "Scan tag looks up by SKU and opens the item",
+      "name": "scan-tag-sku-lookup",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manual SKU 000000000000 -> toast 'No item matches that barcode', dialog stayed open; manual SKU of fixture item -> navigated to /tag/<id> showing correct tag-title"
+    },
+    {
+      "criterion": "Scanner also accepts a QR-style /tag/<id> URL payload",
+      "name": "scanner-accepts-tag-url-payload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manual input of https://example-host.test/tag/<id>?ga=GA-1 pasted into manual-sku-input + Find navigated directly to /tag/<id> with correct tag-title"
+    },
+    {
+      "criterion": "Gift Aid sale allocation records and displays",
+      "name": "test_tscheck_giftaid_sell_allocation.py::test_sell_with_giftaid_ref_sets_and_clears_allocation",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PATCH /api/inventory/{id}/sell {sold:true, sold_price:50} -> 200 status=sold, sold_giftaid_ref=GA-TSCHECK-01; {sold:false} -> 200 status=available, sold_giftaid_ref=null"
+    },
+    {
+      "criterion": "Gift Aid sale allocation records and displays",
+      "name": "giftaid-sale-allocation-banner",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created item with giftaid_ref, sell-dialog showed 'This sale will be allocated to Gift Aid GA-QA-BANNER-01', after confirming sale sold-banner + sold-giftaid text read 'Allocated to Gift Aid GA-QA-BANNER-01'"
+    },
+    {
+      "criterion": "Price tag renders barcode + QR and photo gallery on the item page",
+      "name": "price-tag-barcode-qr-and-gallery",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "tag-barcode svg rendered with >5 rects, tag-qr canvas visible, item-gallery showed gallery-image-0/1; zero console errors, zero >=400 responses on the page"
+    }
+  ]
+}

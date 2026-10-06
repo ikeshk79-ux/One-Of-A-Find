@@ -1,0 +1,81 @@
+{
+  "iteration": 4,
+  "summary": "Verified this iteration's 5 acceptance criteria (appraise-another CTA fix, Gift Aid numeric-only edit, My-branch-only inventory toggle, session-branch persistence, tag-page CTA routing) with new backend/browser artifacts — all passed. Also discovered and fixed test-suite regressions caused by unrelated recent app changes (double-submit CSRF middleware requiring X-CSRF-Token header on unsafe methods, min-6-char PIN validation, lock screen now requiring an explicit 'Manager sign in'/'Create an account' click before the username/PIN form appears, and an added 'Women's dresses' category with the dropdown now alphabetised) by updating conftest.py's login_client helper and 10 pre-existing checks/tests to match the new (intended) behavior — no application bugs found anywhere.",
+  "passed": 19,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "PRIMARY FIX: 'Appraise another item' CTA on a tag page opens the appraisal screen, not a blank page",
+      "name": "appraise-another-cta-opens-appraisal-screen",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Master signed in, opened /tag/{id}, clicked appraise-another-button -> URL became '/' and rendered the capture screen with header (appraise-button, nav-appraise) visible and populated with 'Step 01 Capture the donation' — not blank"
+    },
+    {
+      "criterion": "Gift Aid edit field is numeric-only and persists",
+      "name": "giftaid-edit-numeric-only-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On an existing item's tag page, edit-giftaid-input typed 'GA-12a34' displayed only '1234'; after save-details-button, tag-giftaid showed '1234'; no console error (per spec_deviations, verified against an EXISTING inventory item since new appraisals need a camera)"
+    },
+    {
+      "criterion": "Gift Aid ref is numeric-only server-side too (backend)",
+      "name": "test_tscheck_giftaid_sell_allocation.py::test_sell_with_giftaid_ref_sets_and_clears_allocation",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/inventory {giftaid_ref:'GA-99887'} -> 201 {giftaid_ref:'99887'}; PATCH /sell -> sold_giftaid_ref:'99887'; PATCH unsell -> sold_giftaid_ref:null (test updated from the old alphanumeric expectation to match the numeric-only product decision)"
+    },
+    {
+      "criterion": "'My branch only' toggle scopes Inventory to the session branch",
+      "name": "my-branch-toggle-scopes-inventory",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Before: aria-pressed=false, location-filter enabled, 2 cards shown (Askew Road session). After click: aria-pressed=true, label 'My branch: Askew Road', location-filter disabled, list narrowed to 1 card (matching branch). Toggle off restored 2 cards and re-enabled dropdown"
+    },
+    {
+      "criterion": "Session branch picker persists and syncs across sign-on + header",
+      "name": "session-branch-persists-across-signin-and-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Picked a branch via lock-location-switcher pre-login; header-location-switcher showed the same branch post-login; changed header switcher to a different branch; value retained after navigating Inventory -> Appraise"
+    },
+    {
+      "criterion": "Tag page CTAs route correctly",
+      "name": "tag-page-ctas-route-correctly",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /tag/{id}: Inventory link -> /inventory (nav-appraise + my-branch-toggle visible); appraise-another-button -> '/' (appraise-button + nav-appraise visible)"
+    },
+    {
+      "criterion": "Regression: backend auth/inventory suite (CSRF double-submit, PIN length)",
+      "name": "test_tscheck_auth_and_inventory.py (6 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Updated conftest.login_client to also capture+resend the ooaf_csrf cookie as X-CSRF-Token; updated register test to use >=6 char PINs. All 6 tests (login, master login, wrong pin/unknown user, register, inventory/stats auth, logout) pass"
+    },
+    {
+      "criterion": "Regression: activity audit log + appraise endpoint suites",
+      "name": "test_tscheck_activity_audit_log.py, test_tscheck_appraise_endpoint.py, test_tscheck_scan_sku_lookup.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Fixed anon-CSRF-vs-401 ordering expectation (403 CSRF guard fires before 401 auth check on POST /api/appraise with no cookie) and added missing /tmp/item.jpg fixture image; all 6 remaining backend tests pass (14/14 total)"
+    },
+    {
+      "criterion": "Regression: pre-existing browser checks (lock-screen now gated behind Manager sign in / Create an account links)",
+      "name": "login-unlocks-appraise-page, master-login-shows-activity-log, volunteer-activity-forbidden, volunteer-register-new-account, sign-out-returns-to-lock-screen, inventory-loads-with-stats-and-items",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Added the required 'Manager sign in' / 'Create an account' click before username-input/shop-password-input appear; register flow refills username/pin after a rejected attempt; master PIN corrected to the real ADMIN_PASSWORD. All 6 pass"
+    },
+    {
+      "criterion": "Regression: pre-existing checks issuing POST/DELETE fetches (CSRF) and category dropdown (new 'Women's dresses' category, now alphabetised)",
+      "name": "scan-tag-sku-lookup, scanner-accepts-tag-url-payload, price-tag-barcode-qr-and-gallery, inventory-category-and-availability-filters, inventory-category-dropdown-fixed-list, inventory-sort-reorders-grid",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Added X-CSRF-Token header (read from ooaf_csrf cookie) to all in-page fetch POST/DELETE calls; updated fixed-category list to include 'Women's dresses' and alphabetical order. All 6 pass"
+    }
+  ]
+}

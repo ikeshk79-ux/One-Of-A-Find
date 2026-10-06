@@ -1,0 +1,182 @@
+{
+  "iteration": 3,
+  "summary": "Retest after individual-account auth (username+PIN, master vs volunteer, activity audit log) replaced the shared shop-password login. Updated all pre-existing backend tests/browser checks off the old shared-password flow onto the new login model, added new artifacts for registration, role-gated /activity, attribution+before/after logging, and sign-out. 14 backend tests passed, 13 browser checks passed. No bugs found.",
+  "passed": 27,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Volunteer login works",
+      "name": "test_tscheck_auth_and_inventory.py::test_login_with_correct_credentials_succeeds",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login {username:SarahTest, pin:1234} -> 200 {authenticated:true, username:SarahTest, is_master:false}"
+    },
+    {
+      "criterion": "Master login + audit log",
+      "name": "test_tscheck_auth_and_inventory.py::test_master_login_reports_is_master_true",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login {username:master, pin:master2026} -> 200 {authenticated:true, is_master:true}"
+    },
+    {
+      "criterion": "Auth negatives",
+      "name": "test_tscheck_auth_and_inventory.py::test_login_with_wrong_pin_rejected / test_login_with_unknown_username_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login {username:SarahTest, pin:0000} -> 401; {username:tscheck-nonexistent-user, pin:1234} -> 401"
+    },
+    {
+      "criterion": "New volunteer can register",
+      "name": "test_tscheck_auth_and_inventory.py::test_register_requires_correct_shop_password_and_rejects_duplicate_username",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/register with wrong shop_password -> 401; correct shop_password('oneofafind')+fresh username -> 200 {authenticated:true}; duplicate username re-register -> 409"
+    },
+    {
+      "criterion": "Volunteer login works / Auth negatives (unauthenticated inventory+activity)",
+      "name": "test_tscheck_auth_and_inventory.py::test_inventory_and_stats_require_and_return_after_auth",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Unauthed GET /api/inventory -> 401; unauthed GET /api/activity -> 401; after login GET /api/inventory -> 200 list>=1; GET /api/inventory/stats -> 200 with all stat keys"
+    },
+    {
+      "criterion": "Sign out revokes session",
+      "name": "test_tscheck_auth_and_inventory.py::test_logout_revokes_session",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/inventory -> 200 while logged in; POST /api/auth/logout -> 200; subsequent GET /api/inventory -> 401"
+    },
+    {
+      "criterion": "Volunteer cannot access the audit log / Master login + audit log",
+      "name": "test_tscheck_activity_audit_log.py::test_volunteer_gets_403_from_activity_master_gets_200",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Volunteer GET /api/activity -> 403; master GET /api/activity -> 200 with list"
+    },
+    {
+      "criterion": "Changes are attributed to the actor with before/after on edits; Sold + delete are logged",
+      "name": "test_tscheck_activity_audit_log.py::test_full_item_lifecycle_is_logged_and_attributed_to_volunteer",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Volunteer created/edited/sold/returned/deleted a tscheck item; master's GET /api/activity contains rows for all 5 actions with username=SarahTest; edited row details.changes.title = {from:'tscheck-activity-item', to:'tscheck-activity-item-EDITED'}"
+    },
+    {
+      "criterion": "Volunteer login works",
+      "name": "login-unlocks-appraise-page",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Signed in as SarahTest/1234 via username-input/pin-input/auth-submit-button; landed on Appraise page; current-user shows 'SarahTest'; nav-activity absent"
+    },
+    {
+      "criterion": "New volunteer can register",
+      "name": "volunteer-register-new-account",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Toggled to register mode; wrong shop password left the register form visible (rejected); correct shop password 'oneofafind' + fresh username signed the new user straight into the Appraise page with current-user showing the new username"
+    },
+    {
+      "criterion": "Volunteer cannot access the audit log",
+      "name": "volunteer-activity-forbidden",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Volunteer session has no nav-activity link; force-navigating to /activity shows activity-forbidden and no activity-table"
+    },
+    {
+      "criterion": "Master login + audit log",
+      "name": "master-login-shows-activity-log",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Master session shows nav-activity; clicking it renders activity-table (no activity-forbidden)"
+    },
+    {
+      "criterion": "Sign out revokes session",
+      "name": "sign-out-returns-to-lock-screen",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "logout-button returns to lock screen (auth-submit-button/username-input visible); page reload stays locked, item-photo-slot absent"
+    },
+    {
+      "criterion": "Regression: inventory + stats load after login",
+      "name": "inventory-loads-with-stats-and-items",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated to new username/pin login; GET /api/inventory and /api/inventory/stats returned 200; stats-grid and inventory-list rendered"
+    },
+    {
+      "criterion": "Regression: category filter fixed list",
+      "name": "inventory-category-dropdown-fixed-list",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; dropdown options still match the 14 fixed categories in order"
+    },
+    {
+      "criterion": "Regression: inventory sort",
+      "name": "inventory-sort-reorders-grid",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; price-desc/price-asc/category sort orders verified against API"
+    },
+    {
+      "criterion": "Regression: category+availability filters",
+      "name": "inventory-category-and-availability-filters",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; filter counts matched API counts for category/sold/available"
+    },
+    {
+      "criterion": "Regression: Gift Aid sale allocation",
+      "name": "giftaid-sale-allocation-banner",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; sell-dialog and sold-banner still show correct Gift Aid ref"
+    },
+    {
+      "criterion": "Regression: price tag barcode/QR + gallery",
+      "name": "price-tag-barcode-qr-and-gallery",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; barcode/QR/gallery render with zero console errors and zero >=400 responses"
+    },
+    {
+      "criterion": "Regression: SKU scan lookup",
+      "name": "scan-tag-sku-lookup",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; unknown SKU -> error toast, known SKU -> navigates to /tag/<id>"
+    },
+    {
+      "criterion": "Regression: QR tag URL payload",
+      "name": "scanner-accepts-tag-url-payload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated login; QR URL payload navigates to /tag/<id>"
+    },
+    {
+      "criterion": "Regression: appraise endpoint",
+      "name": "test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal / test_appraise_malformed_body_and_no_session_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Updated login to volunteer username/pin; POST /api/appraise with real image -> 200 valid appraisal; no-session -> 401; empty body -> 422"
+    },
+    {
+      "criterion": "Regression: gift aid sell allocation (backend)",
+      "name": "test_tscheck_giftaid_sell_allocation.py::test_sell_with_giftaid_ref_sets_and_clears_allocation",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Updated login; sell/unsell giftaid_ref allocation still 200 with expected values"
+    },
+    {
+      "criterion": "Regression: SKU lookup (backend)",
+      "name": "test_tscheck_scan_sku_lookup.py::test_lookup_unknown_sku_returns_404 / test_lookup_known_sku_returns_200_and_matches_created_item",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Updated login; unknown sku -> 404; created item's sku lookup -> 200 matching id/title"
+    }
+  ],
+  "notes": [
+    "httpx's cookie jar refuses to resend the backend's Secure session cookie over this suite's plain-http localhost connection (correct prod behavior via https ingress). Worked around in backend/tests/conftest.py::login_client by pinning the Set-Cookie value as a default 'Cookie' header instead of relying on the jar. Not an app bug."
+  ]
+}

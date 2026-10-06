@@ -1,0 +1,116 @@
+{
+  "iteration": 2,
+  "summary": "Retest after password change ('oneofafind') and appraise.py defensive-default change: 9 backend tests + 9 browser checks executed (15 checks[] entries, some grouping multiple backend test functions), covering all 7 acceptance-matrix criteria plus prior regressions. All passed. No bugs found. /api/appraise (live model) called exactly once.",
+  "passed": 15,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Appraise endpoint still works after the appraise.py change",
+      "name": "test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/appraise (real JPEG base64, logged-in session) -> 200 with title/brand/description/condition numeric peak_retail_price/market_average_price/recommended_price present; recommended_price == round(market_average_price*1.15,2); category in the 14 fixed categories. Called exactly once."
+    },
+    {
+      "criterion": "Appraise malformed-body negative",
+      "name": "test_tscheck_appraise_endpoint.py::test_appraise_malformed_body_and_no_session_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/appraise with no cookie -> 401; authenticated POST /api/appraise with empty JSON body ({}) -> 422 (missing required item_image)"
+    },
+    {
+      "criterion": "Login works with the current password",
+      "name": "test_tscheck_auth_and_inventory.py::test_login_with_correct_password_succeeds / test_login_with_wrong_password_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login {password: oneofafind} -> 200 {authenticated:true}; {password: wrong-pass} -> 401"
+    },
+    {
+      "criterion": "Login works with the current password",
+      "name": "login-unlocks-appraise-page",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filled shop-password-input with 'oneofafind', clicked unlock-button; item-photo-slot/label-photo-slot visible on Appraise page after login"
+    },
+    {
+      "criterion": "Inventory + stats load after login",
+      "name": "test_tscheck_auth_and_inventory.py::test_inventory_and_stats_require_and_return_after_auth",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Unauthed GET /api/inventory -> 401; after login (oneofafind) GET /api/inventory -> 200 list>=1; GET /api/inventory/stats -> 200 with total_items/available_items/sold_items/all_time_raised/potential_value"
+    },
+    {
+      "criterion": "Inventory + stats load after login",
+      "name": "inventory-loads-with-stats-and-items",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "GET /api/inventory and /api/inventory/stats returned 200 on nav to Inventory; stats-grid + 4 stat cards visible; inventory-list rendered with >0 inventory-item-* cards"
+    },
+    {
+      "criterion": "Category filter uses the fixed list",
+      "name": "inventory-category-dropdown-fixed-list",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened category-filter dropdown; first option was 'All categories', remaining 14 options matched the exact fixed CATEGORIES list from routers/appraise.py, in order"
+    },
+    {
+      "criterion": "SKU scan lookup still works",
+      "name": "test_tscheck_scan_sku_lookup.py::test_lookup_unknown_sku_returns_404 / test_lookup_known_sku_returns_200_and_matches_created_item",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/inventory/lookup?sku=000000000000 -> 404; POST /api/inventory -> 201 with 12-digit sku, GET /api/inventory/lookup?sku=<sku> -> 200 matching created id/title"
+    },
+    {
+      "criterion": "SKU scan lookup still works",
+      "name": "scan-tag-sku-lookup",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manual SKU 000000000000 -> error toast, dialog stayed open; manual SKU of fixture item -> navigated to /tag/<id> showing correct tag-title"
+    },
+    {
+      "criterion": "SKU scan lookup still works (QR /tag/<id> payload)",
+      "name": "scanner-accepts-tag-url-payload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manual input of https://example-host.test/tag/<id>?ga=GA-1 -> navigated directly to /tag/<id> with correct tag-title"
+    },
+    {
+      "criterion": "Gift Aid sale allocation still works",
+      "name": "test_tscheck_giftaid_sell_allocation.py::test_sell_with_giftaid_ref_sets_and_clears_allocation",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Item created via POST /api/inventory with giftaid_ref; PATCH /api/inventory/{id}/sell {sold:true, sold_price:50} -> 200 sold_giftaid_ref=GA-TSCHECK-01; {sold:false} -> 200 sold_giftaid_ref=null"
+    },
+    {
+      "criterion": "Gift Aid sale allocation still works",
+      "name": "giftaid-sale-allocation-banner",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Item created with giftaid_ref; sell-dialog showed 'This sale will be allocated to Gift Aid GA-QA-BANNER-01'; after confirming, sold-banner showed 'Allocated to Gift Aid GA-QA-BANNER-01'"
+    },
+    {
+      "criterion": "Regression: inventory sort still reorders grid",
+      "name": "inventory-sort-reorders-grid",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "price-desc/price-asc card price ordering correct; category sort order matched API-computed category+title ordering"
+    },
+    {
+      "criterion": "Regression: category+availability combined filters",
+      "name": "inventory-category-and-availability-filters",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck fixture item with fixed category 'Homewear' (existing seed items only carry legacy 'Menswear'); filtering by 'Homewear' matched API count; availability=sold/available filters matched API counts and sold-badge presence"
+    },
+    {
+      "criterion": "Regression: price tag barcode/QR + gallery",
+      "name": "price-tag-barcode-qr-and-gallery",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "tag-barcode svg rendered with >5 rects, tag-qr canvas visible, item-gallery showed gallery images; zero console errors, zero >=400 responses"
+    }
+  ]
+}

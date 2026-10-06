@@ -1,0 +1,266 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/space-grotesk";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: 'Space Grotesk Variable', sans-serif;
+    --font-sans: 'Geist Variable', sans-serif;
+    --font-mono: 'Geist Mono Variable', monospace;
+    --color-gold: var(--gold);
+    --color-gold-dim: var(--gold-dim);
+    --color-gold-ink: var(--gold-ink);
+    --color-obsidian: var(--obsidian);
+    --color-charcoal: var(--charcoal);
+    --color-hairline: var(--hairline);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    /* Brand tokens routed through vars so a theme class can override them at runtime. */
+    --gold: #D9B48F;
+    --gold-dim: #B8936E;
+    --gold-ink: #0B0C0E;
+    --obsidian: #0B0C0E;
+    --charcoal: #16181C;
+    --hairline: #23262D;
+    --background: #0B0C0E;
+    --foreground: #F5F5F7;
+    --card: #16181C;
+    --card-foreground: #F5F5F7;
+    --popover: #16181C;
+    --popover-foreground: #F5F5F7;
+    --primary: #D9B48F;
+    --primary-foreground: #0B0C0E;
+    --secondary: #1D2026;
+    --secondary-foreground: #F5F5F7;
+    --muted: #1D2026;
+    --muted-foreground: #8E929B;
+    --accent: #23262D;
+    --accent-foreground: #D9B48F;
+    --destructive: #FF6B6B;
+    --border: #23262D;
+    --input: #23262D;
+    --ring: #D9B48F;
+    --chart-1: #D9B48F;
+    --chart-2: #B8936E;
+    --chart-3: #8E929B;
+    --chart-4: #4EBA87;
+    --chart-5: #F5A623;
+    --radius: 0.5rem;
+    --sidebar: #16181C;
+    --sidebar-foreground: #F5F5F7;
+    --sidebar-primary: #D9B48F;
+    --sidebar-primary-foreground: #0B0C0E;
+    --sidebar-accent: #23262D;
+    --sidebar-accent-foreground: #D9B48F;
+    --sidebar-border: #23262D;
+    --sidebar-ring: #D9B48F;
+}
+
+.dark {
+    --gold: #D9B48F;
+    --gold-dim: #B8936E;
+    --gold-ink: #0B0C0E;
+    --obsidian: #0B0C0E;
+    --charcoal: #16181C;
+    --hairline: #23262D;
+    --background: #0B0C0E;
+    --foreground: #F5F5F7;
+    --card: #16181C;
+    --card-foreground: #F5F5F7;
+    --popover: #16181C;
+    --popover-foreground: #F5F5F7;
+    --primary: #D9B48F;
+    --primary-foreground: #0B0C0E;
+    --secondary: #1D2026;
+    --secondary-foreground: #F5F5F7;
+    --muted: #1D2026;
+    --muted-foreground: #8E929B;
+    --accent: #23262D;
+    --accent-foreground: #D9B48F;
+    --destructive: #FF6B6B;
+    --border: #23262D;
+    --input: #23262D;
+    --ring: #D9B48F;
+    --sidebar: #16181C;
+    --sidebar-foreground: #F5F5F7;
+    --sidebar-primary: #D9B48F;
+    --sidebar-primary-foreground: #0B0C0E;
+    --sidebar-accent: #23262D;
+    --sidebar-accent-foreground: #D9B48F;
+    --sidebar-border: #23262D;
+    --sidebar-ring: #D9B48F;
+}
+
+/* ── Sunroom Thrift: cream / sage / mustard light theme (toggled via <html class>) ── */
+.theme-sunroom {
+    --background: #FBF6EE;
+    --foreground: #33362C;
+    --card: #D9E2CE;
+    --card-foreground: #33362C;
+    --popover: #E4EBD9;
+    --popover-foreground: #33362C;
+    --primary: #E0A93A;
+    --primary-foreground: #3A2C07;
+    --secondary: #E4EBD9;
+    --secondary-foreground: #33362C;
+    --muted: #E4EBD9;
+    --muted-foreground: #565A48;
+    --accent: #EAE3D2;
+    --accent-foreground: #7C5A10;
+    --destructive: #C0553B;
+    --border: #BFCDAF;
+    --input: #BFCDAF;
+    --ring: #E0A93A;
+    --gold: #E0A93A;
+    --gold-dim: #C99433;
+    --gold-ink: #3A2C07;
+    --chart-1: #E0A93A;
+    --chart-2: #C99433;
+    --chart-3: #8A9A6E;
+    --chart-4: #4E9E77;
+    --chart-5: #C0553B;
+    --obsidian: #FFFDF8;
+    --charcoal: #D9E2CE;
+    --hairline: #BFCDAF;
+    --sidebar: #D9E2CE;
+    --sidebar-foreground: #33362C;
+    --sidebar-primary: #E0A93A;
+    --sidebar-primary-foreground: #3A2C07;
+    --sidebar-accent: #EAE3D2;
+    --sidebar-accent-foreground: #A9741A;
+    --sidebar-border: #BFCDAF;
+    --sidebar-ring: #C7902A;
+}
+
+/* Warm-sunlight accents for the Sunroom scheme — override the gold-tinted obsidian defaults.
+   Unlayered so they beat the @layer utilities base rules. */
+.theme-sunroom .glow-radial {
+    background-image:
+        radial-gradient(120% 90% at 50% -14%, rgba(224, 169, 58, 0.34) 0%, rgba(224, 169, 58, 0.10) 34%, transparent 66%),
+        radial-gradient(70% 55% at 80% -6%, rgba(243, 205, 128, 0.26) 0%, transparent 58%);
+}
+.theme-sunroom .gold-ring {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 251, 238, 0.65),
+        0 0 0 1px rgba(199, 144, 42, 0.30),
+        0 22px 60px -26px rgba(224, 169, 58, 0.60);
+}
+/* Gold is bright mustard for fills/borders/icons, but as TEXT it must darken to meet WCAG AA on
+   the cream/sage surfaces (mustard-on-cream ≈ 2.6:1). Deep goldenrod #8A6410 is ≥5:1 on both. */
+.theme-sunroom .text-gold { color: #8A6410; }
+.theme-sunroom .text-gold\/70 { color: color-mix(in oklab, #8A6410 70%, transparent); }
+.theme-sunroom .text-gold\/80 { color: color-mix(in oklab, #8A6410 80%, transparent); }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+@layer utilities {
+  .display-title {
+    font-family: 'Space Grotesk Variable', sans-serif;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .glow-radial {
+    background-image: radial-gradient(circle at 50% 0%, rgba(217, 180, 143, 0.15) 0%, transparent 70%);
+  }
+  .gold-ring {
+    box-shadow: 0 0 0 1px rgba(217, 180, 143, 0.25), 0 18px 60px -30px rgba(217, 180, 143, 0.55);
+  }
+}
+
+@keyframes shutter-pulse {
+  0% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(217, 180, 143, 0.45); }
+  60% { transform: scale(1.005); box-shadow: 0 0 0 12px rgba(217, 180, 143, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 180, 143, 0); }
+}
+.animate-shutter { animation: shutter-pulse 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+@keyframes gold-sweep {
+  0% { background-position: -140% 0; }
+  100% { background-position: 240% 0; }
+}
+.animate-sweep {
+  background-image: linear-gradient(100deg, transparent 20%, rgba(217, 180, 143, 0.22) 50%, transparent 80%);
+  background-size: 220% 100%;
+  animation: gold-sweep 1.5s linear infinite;
+}
+
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  15%, 55% { transform: translateX(-9px); }
+  35%, 75% { transform: translateX(9px); }
+}
+.animate-shake { animation: pin-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shutter, .animate-sweep, .animate-shake { animation: none; }
+}
+
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .no-print { display: none !important; }
+  .glow-radial { display: none !important; }
+  .print-sheet { box-shadow: none !important; border-color: #000 !important; }
+  /* Bulk tag sheet: two tags per row on A4, never splitting a tag across a page break. */
+  .print-tags-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10mm 8mm !important;
+    margin-top: 0 !important;
+  }
+  .print-tags-grid > * { break-inside: avoid; page-break-inside: avoid; }
+  @page { size: A4; margin: 12mm; }
+}
