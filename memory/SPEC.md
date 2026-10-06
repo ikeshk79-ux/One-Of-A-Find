@@ -1,5 +1,44 @@
 # One Of A Find — Spec
 
+## Forest Thrift Vision (visual overhaul — this fork)
+Default visual language is **Forest Thrift Vision**: forest-green (`#123C35`), cream background
+(`#FAF7F0`), sage accents (`#DCE9DF`), terracotta (`#D96C4F`). Typography is **Inter Variable**
+(Manrope fallback), with Space Grotesk reserved for display accents only. The dark variant uses
+`#101816 / #18211E / #F5F7F5 / #A8B4AF`. Legacy **Obsidian** (dark cinematic gold-on-black) and
+**Sunroom** (cream/mustard) themes are retained and switchable from `/more` — no previous theme
+choice is unreachable. Design tokens live in `src/design-system/{colors,spacing,radius,typography}.ts`;
+CSS variables in `src/index.css` are the runtime source of truth (`:root` is the light default,
+`.dark` is the dark variant, `.theme-obsidian` and `.theme-sunroom` opt in to the legacy palettes).
+
+### Navigation shell (mobile + desktop)
+Four tabs — **Home / Scan / Finds / More** — rendered in a top nav on desktop and a bottom tab bar
+on mobile with Scan floating as a large central circular CTA. All legacy URLs (`/inventory`,
+`/activity`, `/volunteers`, `/tag/:id`, `/print-tags`) remain routable — no bookmark breaks.
+
+### New pages
+- `pages/Home.tsx` — hero "What have you found today?", large tap-to-scan card, weekly/all-time
+  value tiles sourced from `GET /inventory/stats`, Recent finds list (first 5 from `GET /inventory`).
+- `pages/Scan.tsx` — thin wrapper around the existing `Appraise` component (same `POST /api/appraise`
+  flow, same `CameraCapture` dialog — camera-only, no file-upload path has ever existed).
+- `pages/Finds.tsx` — card grid over `GET /inventory`; search box + status filter (`all / available
+  / sold / PAT pending`); mobile users jump to `/inventory` for the full admin view.
+- `pages/More.tsx` — settings hub: profile (reuses `/auth/profile` PATCH), branch via
+  `LocationSwitcher`, theme picker (forest-light/forest-dark/obsidian/sunroom), shortcuts, master-only
+  entries to `/activity` and `/volunteers`, Help, About, Sign out.
+
+### Common primitives
+Under `src/components/common/`: `SectionHeader`, `ValueDisplay`, `ConfidenceBadge`, `LoadingCard`,
+`EmptyState`, `ErrorState`, `BottomNavigation`, `CameraFrame`. Every interactive element meets the
+48 px touch-target rule (`.touch-target` utility).
+
+### What did NOT change
+Pydantic models, FastAPI routers, CSRF/CORS middleware, `CameraCapture` capture pipeline,
+`lib/api.ts`, `lib/session.ts`, `BarcodeScanner`, `PriceTag`, `/demo/*` previews, master credentials.
+
+---
+
+## Original spec
+
 AI appraisal terminal for charity shops. Volunteers photograph a donated item + its brand
 label; Gemini 3 Flash (via Emergent LLM key) identifies it and estimates GBP pricing. The
 recommended charity price = the typical second-hand market price (`market_average_price`), capped at

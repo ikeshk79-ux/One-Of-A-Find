@@ -1,19 +1,26 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: 'Space Grotesk Variable', sans-serif;
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-heading: 'Inter Variable', 'Manrope Variable', 'Geist Variable', sans-serif;
+    --font-sans: 'Inter Variable', 'Manrope Variable', 'Geist Variable', sans-serif;
+    --font-display: 'Space Grotesk Variable', 'Inter Variable', sans-serif;
     --font-mono: 'Geist Mono Variable', monospace;
     --color-gold: var(--gold);
     --color-gold-dim: var(--gold-dim);
     --color-gold-ink: var(--gold-ink);
+    --color-forest: var(--forest);
+    --color-forest-dim: var(--forest-dim);
+    --color-forest-ink: var(--forest-ink);
+    --color-cream: var(--cream);
+    --color-sage: var(--sage);
+    --color-terracotta: var(--terracotta);
     --color-obsidian: var(--obsidian);
     --color-charcoal: var(--charcoal);
     --color-hairline: var(--hairline);
@@ -57,52 +64,116 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── Forest Thrift Vision: default light theme (cream, forest green, sage, terracotta) ──
+   Applied to :root so it's the default on first paint without needing a class on <html>. */
 :root {
-    /* Brand tokens routed through vars so a theme class can override them at runtime. */
-    --gold: #D9B48F;
-    --gold-dim: #B8936E;
-    --gold-ink: #0B0C0E;
-    --obsidian: #0B0C0E;
-    --charcoal: #16181C;
-    --hairline: #23262D;
-    --background: #0B0C0E;
-    --foreground: #F5F5F7;
-    --card: #16181C;
-    --card-foreground: #F5F5F7;
-    --popover: #16181C;
-    --popover-foreground: #F5F5F7;
-    --primary: #D9B48F;
-    --primary-foreground: #0B0C0E;
-    --secondary: #1D2026;
-    --secondary-foreground: #F5F5F7;
-    --muted: #1D2026;
-    --muted-foreground: #8E929B;
-    --accent: #23262D;
-    --accent-foreground: #D9B48F;
-    --destructive: #FF6B6B;
-    --border: #23262D;
-    --input: #23262D;
-    --ring: #D9B48F;
-    --chart-1: #D9B48F;
-    --chart-2: #B8936E;
-    --chart-3: #8E929B;
-    --chart-4: #4EBA87;
-    --chart-5: #F5A623;
-    --radius: 0.5rem;
-    --sidebar: #16181C;
-    --sidebar-foreground: #F5F5F7;
-    --sidebar-primary: #D9B48F;
-    --sidebar-primary-foreground: #0B0C0E;
-    --sidebar-accent: #23262D;
-    --sidebar-accent-foreground: #D9B48F;
-    --sidebar-border: #23262D;
-    --sidebar-ring: #D9B48F;
+    /* Brand accent tokens */
+    --forest: #123C35;
+    --forest-dim: #0E2F2A;
+    --forest-ink: #FAF7F0;
+    --cream: #FAF7F0;
+    --sage: #DCE9DF;
+    --sage-deep: #B9D4C0;
+    --terracotta: #D96C4F;
+    --terracotta-deep: #B9573D;
+    /* Keep gold tokens defined so legacy Obsidian styles still compile */
+    --gold: #123C35;
+    --gold-dim: #0E2F2A;
+    --gold-ink: #FAF7F0;
+    --obsidian: #FFFFFF;
+    --charcoal: #FFFFFF;
+    --hairline: #E5E1D4;
+    --background: #FAF7F0;
+    --foreground: #18201E;
+    --card: #FFFFFF;
+    --card-foreground: #18201E;
+    --popover: #FFFFFF;
+    --popover-foreground: #18201E;
+    --primary: #123C35;
+    --primary-foreground: #FAF7F0;
+    --secondary: #DCE9DF;
+    --secondary-foreground: #123C35;
+    --muted: #F0ECDF;
+    --muted-foreground: #5E786F;
+    --accent: #DCE9DF;
+    --accent-foreground: #123C35;
+    --destructive: #C0553B;
+    --border: #E5E1D4;
+    --input: #E5E1D4;
+    --ring: #123C35;
+    --chart-1: #123C35;
+    --chart-2: #D96C4F;
+    --chart-3: #8A9A6E;
+    --chart-4: #B9D4C0;
+    --chart-5: #E0A93A;
+    --radius: 0.75rem;
+    --sidebar: #FFFFFF;
+    --sidebar-foreground: #18201E;
+    --sidebar-primary: #123C35;
+    --sidebar-primary-foreground: #FAF7F0;
+    --sidebar-accent: #DCE9DF;
+    --sidebar-accent-foreground: #123C35;
+    --sidebar-border: #E5E1D4;
+    --sidebar-ring: #123C35;
 }
 
+/* ── Forest Thrift Vision: DARK variant (deep forest + warm cream text) ── */
 .dark {
+    --forest: #DCE9DF;
+    --forest-dim: #B9D4C0;
+    --forest-ink: #101816;
+    --cream: #F5F7F5;
+    --sage: #1D2A26;
+    --sage-deep: #253531;
+    --terracotta: #E07C5F;
+    --terracotta-deep: #D96C4F;
+    --gold: #DCE9DF;
+    --gold-dim: #B9D4C0;
+    --gold-ink: #101816;
+    --obsidian: #101816;
+    --charcoal: #18211E;
+    --hairline: #2A3A35;
+    --background: #101816;
+    --foreground: #F5F7F5;
+    --card: #18211E;
+    --card-foreground: #F5F7F5;
+    --popover: #18211E;
+    --popover-foreground: #F5F7F5;
+    --primary: #DCE9DF;
+    --primary-foreground: #101816;
+    --secondary: #253531;
+    --secondary-foreground: #F5F7F5;
+    --muted: #1D2A26;
+    --muted-foreground: #A8B4AF;
+    --accent: #253531;
+    --accent-foreground: #DCE9DF;
+    --destructive: #E07C5F;
+    --border: #2A3A35;
+    --input: #2A3A35;
+    --ring: #DCE9DF;
+    --chart-1: #DCE9DF;
+    --chart-2: #E07C5F;
+    --chart-3: #B9D4C0;
+    --chart-4: #8A9A6E;
+    --chart-5: #E0A93A;
+    --sidebar: #18211E;
+    --sidebar-foreground: #F5F7F5;
+    --sidebar-primary: #DCE9DF;
+    --sidebar-primary-foreground: #101816;
+    --sidebar-accent: #253531;
+    --sidebar-accent-foreground: #DCE9DF;
+    --sidebar-border: #2A3A35;
+    --sidebar-ring: #DCE9DF;
+}
+
+/* ── Legacy Obsidian theme (opt-in via <html class="theme-obsidian">) ── */
+.theme-obsidian {
     --gold: #D9B48F;
     --gold-dim: #B8936E;
     --gold-ink: #0B0C0E;
+    --forest: #D9B48F;
+    --forest-dim: #B8936E;
+    --forest-ink: #0B0C0E;
     --obsidian: #0B0C0E;
     --charcoal: #16181C;
     --hairline: #23262D;
@@ -134,7 +205,7 @@
     --sidebar-ring: #D9B48F;
 }
 
-/* ── Sunroom Thrift: cream / sage / mustard light theme (toggled via <html class>) ── */
+/* ── Legacy Sunroom theme (cream / sage / mustard) ── */
 .theme-sunroom {
     --background: #FBF6EE;
     --foreground: #33362C;
@@ -157,6 +228,9 @@
     --gold: #E0A93A;
     --gold-dim: #C99433;
     --gold-ink: #3A2C07;
+    --forest: #E0A93A;
+    --forest-dim: #C99433;
+    --forest-ink: #3A2C07;
     --chart-1: #E0A93A;
     --chart-2: #C99433;
     --chart-3: #8A9A6E;
@@ -175,8 +249,13 @@
     --sidebar-ring: #C7902A;
 }
 
-/* Warm-sunlight accents for the Sunroom scheme — override the gold-tinted obsidian defaults.
-   Unlayered so they beat the @layer utilities base rules. */
+/* Scheme-specific decorative tweaks (legacy obsidian glow kept for the old theme pages) */
+.theme-obsidian .glow-radial {
+    background-image: radial-gradient(circle at 50% 0%, rgba(217, 180, 143, 0.15) 0%, transparent 70%);
+}
+.theme-obsidian .gold-ring {
+    box-shadow: 0 0 0 1px rgba(217, 180, 143, 0.25), 0 18px 60px -30px rgba(217, 180, 143, 0.55);
+}
 .theme-sunroom .glow-radial {
     background-image:
         radial-gradient(120% 90% at 50% -14%, rgba(224, 169, 58, 0.34) 0%, rgba(224, 169, 58, 0.10) 34%, transparent 66%),
@@ -188,8 +267,7 @@
         0 0 0 1px rgba(199, 144, 42, 0.30),
         0 22px 60px -26px rgba(224, 169, 58, 0.60);
 }
-/* Gold is bright mustard for fills/borders/icons, but as TEXT it must darken to meet WCAG AA on
-   the cream/sage surfaces (mustard-on-cream ≈ 2.6:1). Deep goldenrod #8A6410 is ≥5:1 on both. */
+/* Deepen the gold text colour on the sunroom theme so it meets contrast AA on cream */
 .theme-sunroom .text-gold { color: #8A6410; }
 .theme-sunroom .text-gold\/70 { color: color-mix(in oklab, #8A6410 70%, transparent); }
 .theme-sunroom .text-gold\/80 { color: color-mix(in oklab, #8A6410 80%, transparent); }
@@ -202,29 +280,53 @@
     @apply bg-background text-foreground;
     }
   html {
-    @apply font-sans;
+    @apply font-sans antialiased;
     }
 }
 
 @layer utilities {
   .display-title {
-    font-family: 'Space Grotesk Variable', sans-serif;
-    letter-spacing: 0.14em;
+    font-family: var(--font-display);
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     font-weight: 700;
   }
+  .heading-title {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
   .glow-radial {
-    background-image: radial-gradient(circle at 50% 0%, rgba(217, 180, 143, 0.15) 0%, transparent 70%);
+    background-image:
+      radial-gradient(80% 60% at 20% -10%, color-mix(in oklab, var(--sage) 60%, transparent) 0%, transparent 55%),
+      radial-gradient(60% 40% at 110% 0%, color-mix(in oklab, var(--terracotta) 22%, transparent) 0%, transparent 55%);
   }
   .gold-ring {
-    box-shadow: 0 0 0 1px rgba(217, 180, 143, 0.25), 0 18px 60px -30px rgba(217, 180, 143, 0.55);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, var(--border) 60%, transparent),
+      0 10px 36px -22px color-mix(in oklab, var(--primary) 55%, transparent);
   }
+  .forest-ring {
+    box-shadow:
+      0 1px 0 color-mix(in oklab, var(--border) 60%, transparent),
+      0 14px 44px -24px color-mix(in oklab, var(--primary) 55%, transparent);
+  }
+  /* Forest "elevated" card with a subtle inner highlight. */
+  .card-elevated {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, var(--border) 60%, transparent),
+      0 10px 30px -20px color-mix(in oklab, var(--foreground) 20%, transparent);
+  }
+  /* Tap-friendly minimum (brief: 48px) */
+  .touch-target { min-height: 48px; min-width: 48px; }
 }
 
 @keyframes shutter-pulse {
-  0% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(217, 180, 143, 0.45); }
-  60% { transform: scale(1.005); box-shadow: 0 0 0 12px rgba(217, 180, 143, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 180, 143, 0); }
+  0% { transform: scale(0.97); box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent); }
+  60% { transform: scale(1.005); box-shadow: 0 0 0 12px color-mix(in oklab, var(--primary) 0%, transparent); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 0%, transparent); }
 }
 .animate-shutter { animation: shutter-pulse 420ms cubic-bezier(0.22, 1, 0.36, 1); }
 
@@ -233,7 +335,7 @@
   100% { background-position: 240% 0; }
 }
 .animate-sweep {
-  background-image: linear-gradient(100deg, transparent 20%, rgba(217, 180, 143, 0.22) 50%, transparent 80%);
+  background-image: linear-gradient(100deg, transparent 20%, color-mix(in oklab, var(--primary) 22%, transparent) 50%, transparent 80%);
   background-size: 220% 100%;
   animation: gold-sweep 1.5s linear infinite;
 }
@@ -245,8 +347,22 @@
 }
 .animate-shake { animation: pin-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
 
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise { animation: rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes heart-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.3); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.animate-heart { animation: heart-pop 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-shutter, .animate-sweep, .animate-shake { animation: none; }
+  .animate-shutter, .animate-sweep, .animate-shake, .animate-rise, .animate-heart { animation: none; }
 }
 
 @media print {
@@ -254,7 +370,6 @@
   .no-print { display: none !important; }
   .glow-radial { display: none !important; }
   .print-sheet { box-shadow: none !important; border-color: #000 !important; }
-  /* Bulk tag sheet: two tags per row on A4, never splitting a tag across a page break. */
   .print-tags-grid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;

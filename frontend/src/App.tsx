@@ -1,6 +1,9 @@
 import { Routes, Route } from "react-router-dom";
 import RequireAuth from "@/components/RequireAuth";
-import Appraise from "@/pages/Appraise";
+import Home from "@/pages/Home";
+import Scan from "@/pages/Scan";
+import Finds from "@/pages/Finds";
+import More from "@/pages/More";
 import Inventory from "@/pages/Inventory";
 import TagPage from "@/pages/TagPage";
 import PrintTags from "@/pages/PrintTags";
@@ -15,14 +18,50 @@ export default function App() {
       {/* Ungated previews — standalone mocks, do not touch the live login/theme/inventory flows. */}
       <Route path="/demo/sunroom" element={<SunroomDemo />} />
       <Route path="/demo/session-location" element={<SessionLocationDemo />} />
+
+      {/* Forest Thrift Vision shell — Home / Scan / Finds / More */}
       <Route
         path="/"
         element={
           <RequireAuth>
-            <Appraise />
+            <Home />
           </RequireAuth>
         }
       />
+      <Route
+        path="/home"
+        element={
+          <RequireAuth>
+            <Home />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/scan"
+        element={
+          <RequireAuth>
+            <Scan />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/finds"
+        element={
+          <RequireAuth>
+            <Finds />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/more"
+        element={
+          <RequireAuth>
+            <More />
+          </RequireAuth>
+        }
+      />
+
+      {/* Legacy routes — kept so bookmarks and deep links continue to work. */}
       <Route
         path="/inventory"
         element={
