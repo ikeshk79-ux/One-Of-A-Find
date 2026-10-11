@@ -1,0 +1,95 @@
+{
+  "iteration": 13,
+  "mode": "retest",
+  "summary": "Backend 31/31 passed (pre-existing suite, no backend changes in this change set). Browser: 11/11 passed - 5 new Home QuickFind checks (quick-find bar presence, typeahead-to-item, recents+keyboard, scan-to-find) plus re-ran the 6 existing Finds QuickFind/legacy-route checks unchanged after the testid-prefix refactor.",
+  "passed": 11,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Backend suite sanity (no backend changes in this change set)",
+      "name": "pytest -q (31 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q -p no:cacheprovider -> '31 passed in 27.39s'. Confirms no regression from the frontend-only testid-prefix refactor."
+    },
+    {
+      "criterion": "Quick-find bar is present on Home",
+      "name": "home-quick-find-present-above-scan-card",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manager sign-in -> / shows home-quick-find containing home-find-search and home-find-scan-button; bounding-box check confirms home-quick-find.y < home-scan-card.y (quick-find renders above the scan card); hero copy ('What have you found today?') and stats tiles still rendered below."
+    },
+    {
+      "criterion": "Home typeahead jumps straight to an item",
+      "name": "home-find-typeahead-navigates-to-item",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Typed 'jacket' into home-find-search -> home-find-suggestions showed 1-6 [role=option] rows each tagged home-find-suggestion-{id}; clicked the first -> URL became /tag/{that id} with tag-price visible."
+    },
+    {
+      "criterion": "Home recents + keyboard",
+      "name": "home-find-recents-and-keyboard",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened a 'jacket' suggestion from Home and waited for tag-price to confirm the detail fetch completed (seeds localStorage 'recent-items' - seeding is tied to the item-detail load, not just the URL change). Returned to / and focused the empty home-find-search -> home-find-suggestions-recent-label visible with 1-4 option rows including the just-viewed home-find-suggestion-{id}; ArrowDown highlighted it (aria-selected=true) and Enter navigated to its /tag/{id} with tag-price visible; on a fresh focus, Escape closed home-find-suggestions and stayed on / (no navigation)."
+    },
+    {
+      "criterion": "Home scan-to-find",
+      "name": "home-find-scan-button-manual-sku",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "home-find-scan-button opened scanner-dialog ('Scan a price tag'); manual SKU '000000' -> 'No item matches that barcode' toast, dialog stayed open, URL stayed / (one benign 404 console error from the expected failed lookup, not an app bug); manual SKU '725850327966' (seed_facts known-good SKU) -> navigated to /tag/88b0609e-5b74-47c7-a1f0-0d0021e4e3a0 with tag-price visible."
+    },
+    {
+      "criterion": "Finds quick-find unchanged after the testid-prefix refactor (typeahead suggestions)",
+      "name": "quickfind-typeahead-suggestions",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: finds-search 'jacket' -> finds-suggestions visible with 1-6 option rows, title/SKU/brand/price text intact."
+    },
+    {
+      "criterion": "Finds quick-find unchanged after the testid-prefix refactor (suggestion tap navigates)",
+      "name": "quickfind-suggestion-tap-navigates-to-tag",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: clicked finds-suggestion-{id} -> /tag/{that id} with tag-price visible."
+    },
+    {
+      "criterion": "Finds quick-find unchanged after the testid-prefix refactor (keyboard navigation)",
+      "name": "quickfind-keyboard-navigation",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: ArrowDown/ArrowUp highlight moves, Escape closes without navigating, Enter on highlighted option navigates to /tag/{id}."
+    },
+    {
+      "criterion": "Finds quick-find unchanged after the testid-prefix refactor (recents shown when empty)",
+      "name": "quickfind-recent-items-shown-when-empty",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: finds-suggestions-recent-label visible with 1-4 rows after opening an item; typing hides the recent label."
+    },
+    {
+      "criterion": "Finds quick-find unchanged after the testid-prefix refactor (scan-to-find button)",
+      "name": "quickfind-scan-button-manual-sku",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: bogus SKU toast, dialog stays open; known-good SKU navigates to /tag/88b0609e-5b74-47c7-a1f0-0d0021e4e3a0."
+    },
+    {
+      "criterion": "Finds quick-find unchanged after the testid-prefix refactor (status filter chips + legacy /inventory route)",
+      "name": "finds-filters-and-legacy-inventory-route",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: finds-search/filter chips/finds-grid all visible; gibberish query hides finds-grid; sold filter narrows to sold cards; legacy /inventory route still renders inventory-search."
+    }
+  ],
+  "action_items": [
+    "Investigative note (not a bug): recents seeding ('recent-items' in localStorage) only commits after the tag-page item-detail fetch resolves, not immediately on navigation - checks must wait for tag-price visible before asserting on localStorage/recents, otherwise it's a false negative race, not a product bug.",
+    "Carryover from iteration 11/12 (not in this iteration's acceptance_matrix): the persisted check 'tag-page-ctas-route-correctly' still has a stale selector from before the Finds/nav-finds rename and should be refreshed or retired in a future generate pass.",
+    "Inventory collection continues to accumulate tscheck-prefixed fixture residue across iterations (harmless, all in the tscheck- namespace, no seeded rows touched)."
+  ],
+  "retest_needed": false
+}

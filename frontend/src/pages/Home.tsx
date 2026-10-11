@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Camera, Compass, Heart, Sparkles, TrendingUp } from "lucide-react";
 import SectionHeader from "@/components/common/SectionHeader";
+import QuickFind from "@/components/common/QuickFind";
 import ValueDisplay from "@/components/common/ValueDisplay";
 import ConfidenceBadge from "@/components/common/ConfidenceBadge";
 import LoadingCard from "@/components/common/LoadingCard";
@@ -29,6 +31,7 @@ function timeAgo(iso: string | null): string {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [findQuery, setFindQuery] = useState("");
   const { data: session } = useQuery({
     queryKey: sessionKey,
     queryFn: () => apiGet<SessionInfo>("/auth/me"),
@@ -58,6 +61,21 @@ export default function Home() {
         </h1>
         <p className="max-w-prose text-sm text-muted-foreground sm:text-base">
           Take a photo of an item and let our AI investigate what it is and what it could be worth.
+        </p>
+      </section>
+
+      {/* Quick find — look an item up (or scan its tag) the moment the app opens */}
+      <section className="space-y-2" data-testid="home-quick-find">
+        <div className="flex">
+          <QuickFind
+            query={findQuery}
+            onQueryChange={setFindQuery}
+            items={inventory.data ?? []}
+            testidPrefix="home-find"
+          />
+        </div>
+        <p className="px-1 text-xs text-muted-foreground">
+          Search your finds by title, brand or SKU — or tap the scan icon to read a price tag.
         </p>
       </section>
 

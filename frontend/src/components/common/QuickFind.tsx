@@ -29,10 +29,13 @@ export default function QuickFind({
   query,
   onQueryChange,
   items,
+  testidPrefix = "finds",
 }: {
   query: string;
   onQueryChange: (next: string) => void;
   items: InventoryItem[];
+  /** Namespaces the data-testids so the same box can live on more than one page. */
+  testidPrefix?: string;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -144,11 +147,11 @@ export default function QuickFind({
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder="Search by title, brand, category or SKU"
-        data-testid="finds-search"
+        data-testid={`${testidPrefix}-search`}
         aria-label="Search finds"
         role="combobox"
         aria-expanded={listOpen}
-        aria-controls="quick-find-suggestions"
+        aria-controls={`${testidPrefix}-quick-find-suggestions`}
         aria-autocomplete="list"
         autoComplete="off"
         className="h-11 rounded-full pl-10 pr-20"
@@ -163,7 +166,7 @@ export default function QuickFind({
             }}
             aria-label="Clear search"
             className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            data-testid="finds-search-clear"
+            data-testid={`${testidPrefix}-search-clear`}
           >
             <X className="size-4" />
           </button>
@@ -174,7 +177,7 @@ export default function QuickFind({
           aria-label="Scan a price tag to find an item"
           title="Scan a tag"
           className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-          data-testid="finds-scan-button"
+          data-testid={`${testidPrefix}-scan-button`}
         >
           <ScanLine className="size-4" />
         </button>
@@ -182,15 +185,15 @@ export default function QuickFind({
 
       {listOpen && (
         <ul
-          id="quick-find-suggestions"
+          id={`${testidPrefix}-quick-find-suggestions`}
           role="listbox"
-          data-testid="finds-suggestions"
+          data-testid={`${testidPrefix}-suggestions`}
           className="absolute left-0 right-0 top-full z-30 mt-2 max-h-80 origin-top overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-2xl animate-rise"
         >
           {showRecents && (
             <li
               className="flex items-center gap-1.5 px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-              data-testid="finds-suggestions-recent-label"
+              data-testid={`${testidPrefix}-suggestions-recent-label`}
             >
               <Clock className="size-3" /> Recently opened
             </li>
@@ -203,7 +206,7 @@ export default function QuickFind({
                 aria-selected={index === active}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => go(item)}
-                data-testid={`finds-suggestion-${item.id}`}
+                data-testid={`${testidPrefix}-suggestion-${item.id}`}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors",
                   index === active ? "bg-primary/10" : "hover:bg-muted",

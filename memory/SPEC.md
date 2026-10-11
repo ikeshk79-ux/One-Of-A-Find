@@ -16,7 +16,9 @@ on mobile with Scan floating as a large central circular CTA. All legacy URLs (`
 `/activity`, `/volunteers`, `/tag/:id`, `/print-tags`) remain routable — no bookmark breaks.
 
 ### New pages
-- `pages/Home.tsx` — hero "What have you found today?", large tap-to-scan card, weekly/all-time
+- `pages/Home.tsx` — hero "What have you found today?", **quick-find bar** (the same
+  `QuickFind` component as Finds, `testidPrefix="home-find"`) so staff can look an item up or scan a
+  tag straight from the landing screen, large tap-to-scan card, weekly/all-time
   value tiles sourced from `GET /inventory/stats`, Recent finds list (first 5 from `GET /inventory`).
 - `pages/Scan.tsx` — thin wrapper around the existing `Appraise` component (same `POST /api/appraise`
   flow, same `CameraCapture` dialog — camera-only, no file-upload path has ever existed).
