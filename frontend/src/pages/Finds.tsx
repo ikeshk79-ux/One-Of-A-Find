@@ -9,15 +9,14 @@ import {
   Package,
   Search,
   Sparkles,
-  X,
 } from "lucide-react";
 import SectionHeader from "@/components/common/SectionHeader";
+import QuickFind, { matchesQuery } from "@/components/common/QuickFind";
 import ConfidenceBadge from "@/components/common/ConfidenceBadge";
 import LoadingCard from "@/components/common/LoadingCard";
 import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiGet } from "@/lib/api";
 import { gbp } from "@/lib/types";
@@ -61,12 +60,7 @@ export default function Finds() {
         if (!item.is_electrical || item.pat_passed) return false;
       }
       if (!needle) return true;
-      return (
-        item.title.toLowerCase().includes(needle) ||
-        item.brand.toLowerCase().includes(needle) ||
-        item.category.toLowerCase().includes(needle) ||
-        item.sku.includes(needle)
-      );
+      return matchesQuery(item, needle);
     });
   }, [inventory.data, query, status]);
 
@@ -91,29 +85,7 @@ export default function Finds() {
 
       {/* Search + filter row */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title, brand, category or SKU"
-            data-testid="finds-search"
-            aria-label="Search finds"
-            className="h-11 rounded-full pl-10 pr-10"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label="Clear search"
-              className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-              data-testid="finds-search-clear"
-            >
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
+        <QuickFind query={query} onQueryChange={setQuery} items={inventory.data ?? []} />
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by status">
           {(
             [

@@ -27,6 +27,7 @@ import { ApiError } from "@/lib/api";
 import { gbp, CATEGORIES, LOCATIONS, CLOTHING_SIZES, MENS_SIZES, SHOE_SIZES } from "@/lib/types";
 import type { InventoryItem, InventoryStats } from "@/lib/types";
 import { useSessionLocation } from "@/lib/sessionLocation";
+import { resolveScannedCode } from "@/lib/scan";
 
 function StatCard({
   label,
@@ -175,22 +176,15 @@ export default function Inventory() {
 
   const handleScan = useCallback(
     async (raw: string) => {
-      const text = raw.trim();
-      if (!text) return;
-      // QR deep-link (e.g. https://…/tag/<uuid>?ga=GA-001): navigate straight to the item.
-      const urlMatch = text.match(/\/tag\/([0-9a-fA-F-]{36})/);
-      if (urlMatch) {
-        setScanOpen(false);
-        navigate(`/tag/${urlMatch[1]}`);
-        return;
-      }
-      // Barcode payload is the SKU, optionally "SKU*GIFTAID" — the SKU is the part before "*".
-      const sku = text.split("*")[0].trim();
       try {
-        const item = await apiGet<InventoryItem>(`/inventory/lookup?sku=${encodeURIComponent(sku)}`);
+        const hit = await resolveScannedCode(raw);
+        if (!hit) {
+          toast.error("No item matches that barcode");
+          return;
+        }
         setScanOpen(false);
-        toast.success(`Found: ${item.title}`);
-        navigate(`/tag/${item.id}`);
+        if (hit.title) toast.success(`Found: ${hit.title}`);
+        navigate(`/tag/${hit.id}`);
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           toast.error("No item matches that barcode");

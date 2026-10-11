@@ -20,7 +20,13 @@ on mobile with Scan floating as a large central circular CTA. All legacy URLs (`
   value tiles sourced from `GET /inventory/stats`, Recent finds list (first 5 from `GET /inventory`).
 - `pages/Scan.tsx` — thin wrapper around the existing `Appraise` component (same `POST /api/appraise`
   flow, same `CameraCapture` dialog — camera-only, no file-upload path has ever existed).
-- `pages/Finds.tsx` — card grid over `GET /inventory`; search box + status filter (`all / available
+- `pages/Finds.tsx` — card grid over `GET /inventory`; **quick-find** search box
+  (`components/common/QuickFind.tsx`): typeahead dropdown of up to 6 matches on title/brand/category/SKU
+  (prefix hits first) — tap or press Enter to jump straight to `/tag/:id`; arrow-key navigation; when the
+  box is empty it lists the last 4 **recently opened** items (ids kept in `localStorage` under
+  `recent-items` by `lib/recentItems.ts`, written from `TagPage`); a scan button opens `BarcodeScanner`
+  and resolves the tag's barcode/QR via `lib/scan.ts` → `resolveScannedCode()` (QR deep-link `/tag/<uuid>`
+  or SKU through `GET /inventory/lookup?sku=`, shared with `/inventory`). Status filter (`all / available
   / sold / PAT pending`); mobile users jump to `/inventory` for the full admin view.
 - `pages/More.tsx` — settings hub: profile (reuses `/auth/profile` PATCH), branch via
   `LocationSwitcher`, theme picker (forest-light/forest-dark/obsidian/sunroom), shortcuts, master-only

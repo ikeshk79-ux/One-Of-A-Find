@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, BadgeCheck, Copy, Loader2, Maximize2, Pencil, Plus, Printer, RotateCcw, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
@@ -24,6 +24,7 @@ import {
 import PriceTag from "@/components/PriceTag";
 import ImageLightbox from "@/components/ImageLightbox";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { pushRecentItemId } from "@/lib/recentItems";
 import { gbp, BLURB_TONES, CATEGORIES, LOCATIONS, CONDITION_OPTIONS, sizeOptionsFor, adjustedCharityPrice, charityGuidePrice } from "@/lib/types";
 import type { InventoryItem } from "@/lib/types";
 
@@ -53,6 +54,11 @@ export default function TagPage() {
     enabled: Boolean(id),
     retry: false,
   });
+
+  // Feed the Finds quick-find "recently opened" list.
+  useEffect(() => {
+    if (data?.id) pushRecentItemId(data.id);
+  }, [data?.id]);
 
   const sell = useMutation({
     mutationFn: (body: { sold: boolean; sold_price: number | null }) =>

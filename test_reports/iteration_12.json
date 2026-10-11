@@ -1,0 +1,73 @@
+{
+  "iteration": 12,
+  "mode": "retest",
+  "summary": "Backend 31/31 passed (pre-existing suite, unchanged in this change set). Browser: 7/7 passed - new QuickFind typeahead/recents/scan checks plus re-ran the existing finds-filters-and-legacy-inventory-route check unchanged.",
+  "passed": 8,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Legacy /inventory scan still works after the shared-resolver refactor (GET /api/inventory/lookup 200/404)",
+      "name": "test_tscheck_scan_sku_lookup.py::test_lookup_unknown_sku_returns_404 / test_lookup_known_sku_returns_200_and_matches_created_item",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Pre-existing test file re-run: GET /api/inventory/lookup?sku=000000000000 -> 404; created tscheck-lookup-item then GET /api/inventory/lookup?sku=<its sku> -> 200 with matching id/title. Full suite 31/31 passed in 27.36s, confirming shared resolveScannedCode plumbing didn't break this endpoint."
+    },
+    {
+      "criterion": "Typeahead suggestions on the Finds search box",
+      "name": "quickfind-typeahead-suggestions",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manager sign-in -> /finds -> typed 'jacket' into finds-search -> finds-suggestions visible with 1-6 [role=option] rows; first row text contains the title, 'SKU' + brand, and a £-formatted price."
+    },
+    {
+      "criterion": "Tap a suggestion jumps straight to the item's price tag",
+      "name": "quickfind-suggestion-tap-navigates-to-tag",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Clicked finds-suggestion-{id} for the first 'jacket' match -> URL became /tag/{that same id} -> tag-price visible. No intermediate grid scroll/navigation."
+    },
+    {
+      "criterion": "Keyboard navigation in the dropdown",
+      "name": "quickfind-keyboard-navigation",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Two ArrowDown presses highlighted option index 1 (aria-selected=true), one ArrowUp moved highlight back to index 0; Escape closed finds-suggestions and stayed on /finds (no navigation) - note: Escape also natively clears a type=search input in Chromium, so the query was re-typed before the final step; Enter with option index 1 highlighted navigated to that option's /tag/{id} with tag-price visible."
+    },
+    {
+      "criterion": "Recently opened items show when the box is empty",
+      "name": "quickfind-recent-items-shown-when-empty",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened a 'jacket' suggestion (seeding localStorage 'recent-items' in-context), returned to /finds, focused the empty finds-search -> finds-suggestions-recent-label ('Recently opened') visible plus 1-4 option rows including the just-viewed item's finds-suggestion-{id}; typing 'jacket' afterward hid the recent label, confirming matches replace recents."
+    },
+    {
+      "criterion": "Scan-to-find button",
+      "name": "quickfind-scan-button-manual-sku",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "finds-scan-button opened scanner-dialog ('Scan a price tag'); manual SKU '000000' -> 'No item matches that barcode' toast, dialog stayed open, URL stayed /finds (the expected 404 lookup produced one benign console error, not an app bug); manual SKU '725850327966' (seed_facts known-good SKU) -> navigated to /tag/88b0609e-5b74-47c7-a1f0-0d0021e4e3a0 with tag-price visible."
+    },
+    {
+      "criterion": "Existing grid search + status filters still work",
+      "name": "finds-filters-and-legacy-inventory-route",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: finds-search/filter chips/finds-grid all visible; gibberish query hides finds-grid; sold filter narrows to sold cards; legacy /inventory route still renders inventory-search."
+    },
+    {
+      "criterion": "Typeahead suggestions on the Finds search box (public ingress sanity pass)",
+      "name": "quickfind-typeahead-preview-ingress",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same typeahead flow run against https://thrift-vision.preview.emergentagent.com (the public preview ingress) instead of localhost: finds-suggestions rendered with >=1 option for 'jacket', confirming the proxy path works end to end."
+    }
+  ],
+  "action_items": [
+    "Carryover from iteration 11 (not retested here, out of this iteration's acceptance_matrix): the persisted check 'tag-page-ctas-route-correctly' still has a stale selector from before the Finds/nav-finds rename and should be refreshed or retired in a future generate pass.",
+    "Inventory collection continues to accumulate tscheck-prefixed fixture residue across iterations (harmless, all in the tscheck- namespace, no seeded rows touched)."
+  ],
+  "retest_needed": false
+}
