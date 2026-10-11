@@ -1,0 +1,76 @@
+{
+  "iteration": 9,
+  "summary": "Retest of the 2-criterion matrix following the BrandLogo.tsx migration from logo.clearbit.com (decommissioned) to unavatar.io?fallback=false. Replaced the price-tag-brand-logo-clearbit browser check with price-tag-brand-logo-unavatar, which now PASSES end-to-end: Levi's seeded item renders tag-brand-logo with src starting https://unavatar.io/levi.com?fallback=false, naturalWidth/naturalHeight > 0 (real decoded image), and alt text containing Levi's. Unbranded seeded item shows zero tag-brand-logo elements. 'Zxy Nonexistent Fake Brand' seeded item correctly shows zero tag-brand-logo elements after unavatar.io returned a 404 (confirms fallback=false suppresses the generic-placeholder masking behaviour previously impossible to verify against Clearbit). Full regression: backend pytest suite is 27/28 passing -- the 1 failure (test_login_with_unknown_username_rejected) is a pre-existing login rate-limiter lockout (429 'Too many attempts') triggered by this session's own repeated test runs against the same IP, unrelated to the BrandLogo change; it is not a regression introduced by this iteration. Re-ran 6 previously-passing browser checks by name only (single-photo-warning-snapshot-behaviour, login-populates-csrf-sessionstorage, appraise-save-success-moment-and-why-estimate, more-page-theme-mission-shortcuts, finds-filters-and-legacy-inventory-route, home-to-scan-bottom-nav) -- all green, no console errors on the happy path, and home-to-scan-bottom-nav additionally verified against the public preview URL.",
+  "passed": 7,
+  "failed": 1,
+  "bugs": [
+    {
+      "severity": "low",
+      "criterion": "REGRESSION: full `python -m pytest -q` in /app/backend still passes (28/28)",
+      "description": "test_login_with_unknown_username_rejected got a 429 'Too many attempts. Try again in 8 minutes.' instead of the expected 401, because this testing session's repeated login calls (across this iteration's and prior iterations' suite runs) tripped the auth endpoint's own IP-based rate limiter before this test's own request landed. The rate limiter itself is behaving correctly (it is designed to lock out repeated attempts) -- this is a test/environment collision, not a defect introduced by the BrandLogo.tsx change, and is unrelated to either acceptance criterion in this iteration's matrix. Re-running the single test in isolation still returned 429 (lockout window still active, confirming it's a timing/quota issue rather than a flake that clears on retry).",
+      "evidence": "cd /app/backend && python -m pytest -q -p no:cacheprovider: 27 passed, 1 failed -- AssertionError: {\"detail\":\"Too many attempts. Try again in 8 minutes.\"} assert 429 == 401. Isolated re-run of the same test (python -m pytest tests/test_tscheck_auth_and_inventory.py::test_login_with_unknown_username_rejected) returned the identical 429."
+    }
+  ],
+  "action_items": [
+    "backend/tests/test_tscheck_auth_and_inventory.py::test_login_with_unknown_username_rejected needs to stop colliding with the login rate limiter: use a per-run-unique throwaway username/IP-independent path, or have conftest wait out/reset the lockout, so the 401-unknown-username assertion isn't masked by a 429 when the suite (or testing sessions) run login calls repeatedly in a short window. Not a BrandLogo-related regression."
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "FEATURE (bug-fix re-verify): price tag renders a brand logo for Levi's via unavatar.io, hides for Unbranded, hides gracefully for unresolvable brands",
+      "name": "price-tag-brand-logo-unavatar",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Seeded 3 real inventory rows via POST /api/inventory (tscheck-brandlogo-levis brand=\"Levi's\", tscheck-brandlogo-unbranded brand='Unbranded', tscheck-brandlogo-unresolved brand='Zxy Nonexistent Fake Brand'). /tag/{leviId}: tag-brand-logo visible, src='https://unavatar.io/levi.com?fallback=false' (DOMAIN_OVERRIDES resolved), alt contains \"Levi's\", naturalWidth/naturalHeight > 0 (real decoded PNG), no console error referencing unavatar.io for this request. /tag/{unbrandedId}: tag-brand text='Unbranded', tag-brand-logo count==0. /tag/{unresolvedId}: tag-brand text='Zxy Nonexistent Fake Brand', tag-brand-logo count==0 (console logged a single 404 for the unavatar.io request for this brand, confirming fallback=false + onError hid the element as designed). Seeded rows cleaned up via DELETE /api/inventory/{id} with CSRF header. Old price-tag-brand-logo-clearbit.mjs artifact removed and superseded by this check."
+    },
+    {
+      "criterion": "REGRESSION: full backend pytest suite",
+      "name": "backend/tests (pytest -q)",
+      "lane": "backend",
+      "status": "failed",
+      "evidence": "cd /app/backend && python -m pytest -q: 27 passed, 1 failed on test_login_with_unknown_username_rejected (429 'Too many attempts. Try again in 8 minutes.' instead of expected 401) -- re-ran the single test in isolation and it still returned 429, consistent with an active rate-limiter lockout window from this session's repeated login calls rather than an app regression; all other 27 tests including the appraise/grounding, CSRF, giftaid, inventory and activity-log suites passed cleanly."
+    },
+    {
+      "criterion": "REGRESSION: single-photo confidence warning snapshot behaviour (iteration-8 lane)",
+      "name": "single-photo-warning-snapshot-behaviour",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name only: item-photo-only -> single-photo-warning visible; label added post-appraisal -> warning still visible (snapshot behaviour preserved); both photos captured before appraise -> warning count==0. Unaffected by BrandLogo swap."
+    },
+    {
+      "criterion": "REGRESSION: login populates CSRF in sessionStorage, carried on POST, cleared on logout",
+      "name": "login-populates-csrf-sessionstorage",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name only: csrf token present in sessionStorage after login, POST /api/inventory succeeded carrying X-CSRF-Token header, token cleared from sessionStorage after logout."
+    },
+    {
+      "criterion": "REGRESSION: appraise Save -> SuccessMoment -> WhyThisEstimate flow",
+      "name": "appraise-save-success-moment-and-why-estimate",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name only: real /api/appraise call returned appraisal-result, WhyThisEstimate accordion expanded with rationale content, Save produced SuccessMoment, Scan Another reset the flow. /api/appraise response shape unaffected by the BrandLogo src swap."
+    },
+    {
+      "criterion": "REGRESSION: More page theme/mission/master shortcuts",
+      "name": "more-page-theme-mission-shortcuts",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name only: theme options order correct, System theme selectable and persists after reload, mission text and master shortcuts visible."
+    },
+    {
+      "criterion": "REGRESSION: Finds filters + legacy /inventory/{id} route",
+      "name": "finds-filters-and-legacy-inventory-route",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name only: Finds page loads, search with no match shows empty state, Sold filter narrows results, legacy /inventory/{id} route still resolves to the tag page."
+    },
+    {
+      "criterion": "REGRESSION: Home -> Scan bottom nav (also verified against public preview URL)",
+      "name": "home-to-scan-bottom-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name only twice: once against localhost (default saved URL) and once explicitly against https://thrift-vision.preview.emergentagent.com -- both passed, bottom nav takes Home -> Scan correctly on the public ingress path."
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import BrandLogo from "@/components/BrandLogo";
 import type { InventoryItem } from "@/lib/types";
 import { gbp, CONDITION_MULTIPLIERS } from "@/lib/types";
 
@@ -40,12 +41,17 @@ export default function PriceTag({ item }: { item: InventoryItem }) {
         <span className="display-title text-[10px]">One Of A Find</span>
         <span className="font-mono text-[10px]">{item.condition}</span>
       </div>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-widest" data-testid="tag-brand">
-        {item.brand}
-      </p>
-      <h2 className="mt-1 text-lg leading-tight font-bold" data-testid="tag-title">
-        {item.title}
-      </h2>
+      <div className="mt-3 flex items-start gap-2">
+        <BrandLogo brand={item.brand} size={28} testid="tag-brand-logo" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-widest" data-testid="tag-brand">
+            {item.brand}
+          </p>
+          <h2 className="mt-1 text-lg leading-tight font-bold" data-testid="tag-title">
+            {item.title}
+          </h2>
+        </div>
+      </div>
       <p className="mt-1 text-[11px] text-black/60" data-testid="tag-category">
         {item.category}
         {item.size ? ` · Size ${item.size}` : ""}

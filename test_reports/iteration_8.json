@@ -1,0 +1,49 @@
+{
+  "iteration": 8,
+  "summary": "Retest of the 4-criterion matrix: Gemini googleSearch grounding on /api/appraise, single-photo confidence warning snapshot behaviour, Clearbit brand-logo rendering on the price tag, and full regression. Fetched a real JPEG fixture (/tmp/item.jpg, a denim photo from Unsplash) so the previously-blocked backend appraise test could finally run; backend grounding implementation (with_tools([{googleSearch:{}}]) wrapped in try/except, send_message retry-once-ungrounded-then-502) matches spec and the full 28-test pytest suite passes, including a real end-to-end grounded appraisal. The single-photo-warning snapshot behaviour (shows for item-only, persists after a late label add, absent for item+label-before-appraise) was verified end-to-end on /scan and passed cleanly. The brand-logo criterion surfaced a REAL bug: Clearbit's public Logo API (logo.clearbit.com) has been fully decommissioned (deprecated Mar 2025, shut down Dec 2025 per vendor docs) and no longer resolves in DNS at all, so the <img> for ANY brand (including Levi's, the documented positive case) always onErrors and unmounts — confirmed by curl (Could not resolve host: logo.clearbit.com) and in-browser (net::ERR_NAME_NOT_RESOLVED). The Unbranded and unknown-brand negative cases still pass (graceful degradation working as designed), but the positive Levi's-logo-renders case can never pass against the current third-party dependency. Re-ran 5 previously-passing browser checks (CSRF-via-body, save/SuccessMoment/WhyThisEstimate, more-page, finds/legacy-inventory, home nav) plus the full backend suite with zero regressions.",
+  "passed": 7,
+  "failed": 1,
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "price tag renders a brand logo (via Clearbit) for brands with a resolvable domain",
+      "description": "Clearbit's free public Logo API (https://logo.clearbit.com) was deprecated in March 2025 and fully shut down in December 2025 (per HubSpot's own changelog/community posts). The hostname no longer resolves in DNS at all, so EVERY <img src=\"https://logo.clearbit.com/...\"> request fails and BrandLogo's onError handler unmounts the element -- including for Levi's, the documented positive/working case. The graceful-degradation path (Unbranded, unresolvable brand names) still behaves correctly because it degrades to the exact same 'no logo shown' end state, masking the breakage, but no brand logo can ever render in production today. Recommend migrating BrandLogo.tsx from logo.clearbit.com to a live replacement (e.g. img.logo.dev with a free publishable key, or Brandfetch) to restore the intended feature.",
+      "evidence": "curl -v https://logo.clearbit.com/levi.com?size=128 -> 'curl: (6) Could not resolve host: logo.clearbit.com'. getent hosts logo.clearbit.com returns nothing (vs. getent hosts clearbit.com resolving fine, and getent hosts images.unsplash.com resolving fine) -- the logo subdomain specifically is dead. Browser check price-tag-brand-logo-clearbit: console 'Failed to load resource: net::ERR_NAME_NOT_RESOLVED' x2, and getByTestId('tag-brand-logo') never appears for a seeded Levi's item (tscheck-brandlogo-levis), timing out after 8s with 'element(s) not found'. Unbranded and 'Zxy Nonexistent' seeded items (tscheck-brandlogo-unbranded, tscheck-brandlogo-unresolved) both correctly show zero tag-brand-logo elements, matching spec for the negative cases."
+    }
+  ],
+  "action_items": [
+    "BrandLogo.tsx depends on a fully decommissioned third-party API (logo.clearbit.com). Needs migration to a live logo service (logo.dev / Brandfetch / LogoKit) for the feature to ever render a logo in this build.",
+    "Historical note: /tmp/item.jpg fixture (flagged missing in iterations 1-7) was recreated this iteration from a public Unsplash JPEG so the real-image appraise backend test now runs; this is an environment artifact, not source code, and will need recreating again if /tmp is wiped between sessions."
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "FEATURE: /api/appraise attaches Gemini googleSearch grounding, try/except fallback to ungrounded, retry-once-then-502 on send_message failure, still returns valid Appraisal JSON",
+      "name": "backend/tests/test_tscheck_appraise_endpoint.py (2 tests) + full suite (28 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Inspected /app/backend/routers/appraise.py: chat.with_tools([{'googleSearch': {}}]) is wrapped in try/except logging a warning and falling through to the ungrounded chat object; the send_message call is wrapped separately with a retry using a fresh ungrounded LlmChat before raising HTTPException(502). POST /api/appraise with a real JPEG fetched from Unsplash (stored at /tmp/item.jpg) as logged-in volunteer -> 200; response contained title, brand, category (in the 15-item CATEGORIES list), description, condition, peak_retail_price/market_average_price/recommended_price as numbers, price_source=='charity', recommended_price matching the documented charity-base/50%-cap/round-to-50p formula. Full `python -m pytest -q` -> 28 passed, 0 failed (previously 1 failure due to missing fixture image, now resolved)."
+    },
+    {
+      "criterion": "FEATURE: single-photo confidence warning shows/hides per appraisedWithLabel snapshot taken at appraise.mutate() start",
+      "name": "single-photo-warning-snapshot-behaviour",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Real camera-mocked /scan flow: item-photo-only -> real POST /api/appraise -> appraisal-result visible -> single-photo-warning present with role='note', text containing 'Confidence may be lower.' and 'Capture the brand label'. Added a label photo AFTER the appraisal returned (same result still shown) -> single-photo-warning remained visible (snapshot behaviour, not reactive to current labelImage state). Reset, then captured BOTH item and label photos BEFORE tapping Appraise -> real POST /api/appraise -> appraisal-result visible -> single-photo-warning count == 0."
+    },
+    {
+      "criterion": "FEATURE: price tag renders Clearbit brand logo for resolvable brands (Levi's), hides for Unbranded, hides on Clearbit 404/onError for unresolvable brands",
+      "name": "price-tag-brand-logo-clearbit",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "Seeded 3 real inventory rows via POST /api/inventory (tscheck-brandlogo-levis brand=\"Levi's\", tscheck-brandlogo-unbranded brand='Unbranded', tscheck-brandlogo-unresolved brand='Zxy Nonexistent'). /tag/{unbrandedId}: tag-brand shows 'Unbranded', tag-brand-logo count==0 (PASS). /tag/{unresolvedId}: tag-brand shows 'Zxy Nonexistent', tag-brand-logo count==0 after onError (PASS). /tag/{leviId}: tag-brand-logo never became visible within 8s -- element not found. Console showed net::ERR_NAME_NOT_RESOLVED. Confirmed via curl that logo.clearbit.com does not resolve in DNS at all (service decommissioned Dec 2025). See bugs[0]. Seeded rows cleaned up via DELETE /api/inventory/{id} with CSRF header."
+    },
+    {
+      "criterion": "REGRESSION: full existing suite still green (backend contract, CSRF-via-body, save/SuccessMoment/WhyThisEstimate, more/theme/mission, finds filters, home nav)",
+      "name": "full backend pytest suite + 5 re-run browser checks (login-populates-csrf-sessionstorage, appraise-save-success-moment-and-why-estimate, more-page-theme-mission-shortcuts, finds-filters-and-legacy-inventory-route, home-to-scan-bottom-nav)",
+      "lane": "backend+browser",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 28 passed, 0 failed. All 5 re-run browser checks (by name only, no script resend) passed with no new console errors: CSRF body-token flow (sessionStorage populated/cleared, POST /api/inventory carries X-CSRF-Token and succeeds), real appraise->SuccessMoment->WhyThisEstimate accordion content, more-page theme/mission/master shortcuts, finds search/sold filters + legacy /inventory/{id} route, home->scan bottom nav. /api/appraise response shape unchanged (same fields/ranges) confirming grounding did not alter the contract."
+    }
+  ]
+}

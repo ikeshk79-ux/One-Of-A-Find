@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Camera, Check, Copy, Loader2, Plus, Save, Sparkles, Tag as TagIcon, X } from "lucide-react";
+import { AlertTriangle, Camera, Check, Copy, Loader2, Plus, Save, Sparkles, Tag as TagIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -143,6 +143,10 @@ export default function Appraise() {
   const [isElectrical, setIsElectrical] = useState(false);
   const [customPrice, setCustomPrice] = useState("");
   const [savedItem, setSavedItem] = useState<InventoryItem | null>(null);
+  // Captures whether the appraisal that produced `result` was made with a brand label present.
+  // Null = no appraisal yet; set when the mutation starts so the warning doesn't flicker if the
+  // volunteer later adds a label photo without re-appraising.
+  const [appraisedWithLabel, setAppraisedWithLabel] = useState<boolean | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   // Show the 3-step tour once for a new volunteer on this device; reopenable via "How it works".
   useEffect(() => {
@@ -161,13 +165,17 @@ export default function Appraise() {
   }, [sessionLocation, setLocation]);
 
   const appraise = useMutation({
-    mutationFn: () =>
-      apiPost<Appraisal>("/appraise", {
+    mutationFn: () => {
+      // Snapshot whether a label photo was supplied at the moment the AI call starts so the
+      // single-photo confidence warning stays accurate even if the volunteer later uploads one.
+      setAppraisedWithLabel(labelImage !== null);
+      return apiPost<Appraisal>("/appraise", {
         item_image: itemImage,
         label_image: labelImage,
         extra_images: extraImages,
         notes: notes.trim() || null,
-      }),
+      });
+    },
     onSuccess: (data) => {
       setResult(data);
       // Respect a category the volunteer already picked pre-appraisal when the AI's guess isn't a
@@ -246,6 +254,7 @@ export default function Appraise() {
     setCustomPrice("");
     setCondition("Good");
     setIsElectrical(false);
+    setAppraisedWithLabel(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -566,6 +575,21 @@ export default function Appraise() {
                   Estimate only — not a guaranteed sale price.
                 </span>
               </div>
+              {appraisedWithLabel === false && (
+                <div
+                  role="note"
+                  data-testid="single-photo-warning"
+                  className="mt-3 flex items-start gap-3 rounded-xl border border-[color-mix(in_oklab,var(--terracotta)_40%,transparent)] bg-[color-mix(in_oklab,var(--terracotta)_10%,var(--card))] p-3 text-xs text-foreground"
+                >
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[color:var(--terracotta-deep)]" />
+                  <span>
+                    <strong>Confidence may be lower.</strong> This appraisal was made from a single
+                    photo. Capture the brand label and tap{" "}
+                    <span className="font-semibold">Appraise item</span> again for a sharper
+                    identification and tighter price range.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">

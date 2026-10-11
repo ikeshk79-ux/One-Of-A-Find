@@ -91,6 +91,15 @@ async def appraise(body: AppraiseRequest, _: bool = Depends(require_session)):
         system_message=SYSTEM,
     ).with_model("gemini", "gemini-3-flash-preview")
 
+    # Google Search grounding lifts appraisal confidence by letting Gemini pull real
+    # comparable listings (Vinted/eBay/Depop/retailer archives) while it thinks. If the
+    # emergentintegrations build in this pod can't attach the tool for any reason, we fall
+    # back to the ungrounded chat below without blocking the user.
+    try:
+        chat = chat.with_tools([{"googleSearch": {}}])
+    except Exception:  # noqa: BLE001
+        logger.warning("googleSearch grounding unavailable; falling back to ungrounded appraisal", exc_info=True)
+
     images = [ImageContent(image_base64=_b64(body.item_image))]
     if body.label_image:
         images.append(ImageContent(image_base64=_b64(body.label_image)))
@@ -111,8 +120,20 @@ async def appraise(body: AppraiseRequest, _: bool = Depends(require_session)):
     try:
         raw = await chat.send_message(UserMessage(text=text, file_contents=images))
     except Exception as exc:  # noqa: BLE001
-        logger.exception("appraisal failed")
-        raise HTTPException(status_code=502, detail="AI appraisal failed. Please try again.") from exc
+        # Grounded call failed — common cause is the Gemini provider rejecting googleSearch
+        # on a particular key tier. Retry once without the tool so the volunteer still gets
+        # an appraisal (lower confidence, but better than a 502).
+        logger.warning("grounded appraisal failed, retrying ungrounded", exc_info=exc)
+        try:
+            fallback = LlmChat(
+                api_key=api_key,
+                session_id=f"appraise-{uuid.uuid4()}",
+                system_message=SYSTEM,
+            ).with_model("gemini", "gemini-3-flash-preview")
+            raw = await fallback.send_message(UserMessage(text=text, file_contents=images))
+        except Exception as exc2:  # noqa: BLE001
+            logger.exception("appraisal failed")
+            raise HTTPException(status_code=502, detail="AI appraisal failed. Please try again.") from exc2
 
     cleaned = FENCE.sub("", str(raw)).strip()
     start, end = cleaned.find("{"), cleaned.rfind("}")

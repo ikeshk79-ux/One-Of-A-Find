@@ -41,8 +41,11 @@ def test_login_with_wrong_pin_rejected():
 
 
 def test_login_with_unknown_username_rejected():
+    # Use a per-run-unique username so the auth rate limiter (which keys on username) can't
+    # mask the 401 with a 429 lockout when the suite is re-run inside its cooldown window.
+    unknown = f"tscheck-ghost-{uuid.uuid4().hex[:10]}"
     with httpx.Client(timeout=30.0) as c:
-        resp = c.post(api_url("/auth/login"), json={"username": "tscheck-nonexistent-user", "pin": "1234"})
+        resp = c.post(api_url("/auth/login"), json={"username": unknown, "pin": "1234"})
         assert resp.status_code == 401, resp.text
 
 
