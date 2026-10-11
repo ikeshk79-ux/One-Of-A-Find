@@ -117,6 +117,45 @@ async def appraise(body: AppraiseRequest, _: bool = Depends(require_session)):
     if body.notes:
         text += f"\nVolunteer notes: {body.notes}"
 
+    def _parse_appraisal(raw_text: str) -> dict:
+        """Extract the appraisal JSON object from the model response, tolerating any
+        pre/post prose, code fences, or grounding citations the model may interleave."""
+        cleaned = FENCE.sub("", str(raw_text)).strip()
+        # First try: a straight brace-span extraction (handles the common grounded case where
+        # Gemini writes "Based on Vinted comparables: {...}" or wraps the JSON in prose).
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start != -1 and end != -1:
+            try:
+                return json.loads(cleaned[start : end + 1])
+            except json.JSONDecodeError:
+                pass
+        # Second try: scan for a balanced {...} block (defends against stray trailing braces
+        # inside grounding citation blobs that broke the simple find/rfind window).
+        depth = 0
+        obj_start = -1
+        for i, ch in enumerate(cleaned):
+            if ch == "{":
+                if depth == 0:
+                    obj_start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and obj_start != -1:
+                    try:
+                        return json.loads(cleaned[obj_start : i + 1])
+                    except json.JSONDecodeError:
+                        obj_start = -1
+                        continue
+        raise ValueError("could not extract a JSON object from the model response")
+
+    def _run_ungrounded() -> "asyncio.Future":  # type: ignore[name-defined]
+        fallback = LlmChat(
+            api_key=api_key,
+            session_id=f"appraise-{uuid.uuid4()}",
+            system_message=SYSTEM,
+        ).with_model("gemini", "gemini-3-flash-preview")
+        return fallback.send_message(UserMessage(text=text, file_contents=images))
+
     try:
         raw = await chat.send_message(UserMessage(text=text, file_contents=images))
     except Exception as exc:  # noqa: BLE001
@@ -125,26 +164,22 @@ async def appraise(body: AppraiseRequest, _: bool = Depends(require_session)):
         # an appraisal (lower confidence, but better than a 502).
         logger.warning("grounded appraisal failed, retrying ungrounded", exc_info=exc)
         try:
-            fallback = LlmChat(
-                api_key=api_key,
-                session_id=f"appraise-{uuid.uuid4()}",
-                system_message=SYSTEM,
-            ).with_model("gemini", "gemini-3-flash-preview")
-            raw = await fallback.send_message(UserMessage(text=text, file_contents=images))
+            raw = await _run_ungrounded()
         except Exception as exc2:  # noqa: BLE001
             logger.exception("appraisal failed")
             raise HTTPException(status_code=502, detail="AI appraisal failed. Please try again.") from exc2
 
-    cleaned = FENCE.sub("", str(raw)).strip()
-    start, end = cleaned.find("{"), cleaned.rfind("}")
-    if start == -1 or end == -1:
-        raise HTTPException(status_code=502, detail="AI returned an unreadable response")
-
-    data: dict = {}  # defensive default; the except below raises before data is ever read unset
     try:
-        data = json.loads(cleaned[start : end + 1])
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail="AI returned invalid JSON") from exc
+        data = _parse_appraisal(raw)
+    except ValueError:
+        # Grounding sometimes makes Gemini answer in citation prose with no usable JSON object.
+        # Retry once ungrounded (stricter JSON adherence) before giving up on the volunteer.
+        logger.warning("grounded appraisal was unparseable, retrying ungrounded")
+        try:
+            data = _parse_appraisal(await _run_ungrounded())
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("appraisal response unparseable")
+            raise HTTPException(status_code=502, detail="AI returned an unreadable response") from exc
 
     def num(key: str) -> float:
         try:

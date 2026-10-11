@@ -3,7 +3,7 @@ import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import BrandLogo from "@/components/BrandLogo";
 import type { InventoryItem } from "@/lib/types";
-import { gbp, CONDITION_MULTIPLIERS } from "@/lib/types";
+import { gbp } from "@/lib/types";
 
 export default function PriceTag({ item }: { item: InventoryItem }) {
   const barcodeRef = useRef<SVGSVGElement>(null);
@@ -64,13 +64,6 @@ export default function PriceTag({ item }: { item: InventoryItem }) {
           </p>
           <p className="mt-1 text-[10px] text-black/60" data-testid="tag-condition">
             {item.condition} condition
-            {item.price_source === "charity" && (
-              <>
-                {" · priced at "}
-                {Math.round((CONDITION_MULTIPLIERS[item.condition] ?? CONDITION_MULTIPLIERS.Good) * 100)}
-                % of guide
-              </>
-            )}
           </p>
         </div>
         <canvas ref={qrRef} data-testid="tag-qr" />

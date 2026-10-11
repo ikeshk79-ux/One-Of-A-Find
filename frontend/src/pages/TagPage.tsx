@@ -39,6 +39,9 @@ export default function TagPage() {
   const [editPrice, setEditPrice] = useState("");
   const [editSize, setEditSize] = useState("");
   const [editCondition, setEditCondition] = useState<string>("Good");
+  // Snapshot the item's saved condition at dialog-open time so the "Re-price from X condition"
+  // button only appears once the volunteer has actually changed the grade.
+  const [initialEditCondition, setInitialEditCondition] = useState<string>("Good");
   const [editPriceSource, setEditPriceSource] = useState<string>("charity");
   const [editGiftAid, setEditGiftAid] = useState("");
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -191,6 +194,11 @@ export default function TagPage() {
                 setEditPriceSource(data.price_source ?? "charity");
                 setEditSize(data.size ?? "");
                 setEditCondition(
+                  (CONDITION_OPTIONS as readonly string[]).includes(data.condition)
+                    ? data.condition
+                    : "Good",
+                );
+                setInitialEditCondition(
                   (CONDITION_OPTIONS as readonly string[]).includes(data.condition)
                     ? data.condition
                     : "Good",
@@ -514,19 +522,23 @@ export default function TagPage() {
                 data-testid="edit-price-input"
                 className="bg-obsidian font-mono"
               />
-              <button
-                type="button"
-                data-testid="reprice-from-condition"
-                onClick={() => {
-                  if (!data) return;
-                  const guide = charityGuidePrice(data.peak_retail_price, data.market_average_price);
-                  setEditPrice(String(adjustedCharityPrice(guide, editCondition)));
-                  setEditPriceSource("charity");
-                }}
-                className="text-[11px] font-medium text-gold underline-offset-2 transition-colors hover:underline"
-              >
-                Re-price from {editCondition} condition
-              </button>
+              {editCondition !== initialEditCondition && (
+                <Button
+                  type="button"
+                  size="sm"
+                  data-testid="reprice-from-condition"
+                  onClick={() => {
+                    if (!data) return;
+                    const guide = charityGuidePrice(data.peak_retail_price, data.market_average_price);
+                    setEditPrice(String(adjustedCharityPrice(guide, editCondition)));
+                    setEditPriceSource("charity");
+                  }}
+                  className="mt-2 h-10 w-full justify-center bg-gold text-gold-ink hover:bg-gold-dim"
+                >
+                  <Sparkles className="size-4" />
+                  Re-price from {editCondition} condition
+                </Button>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-giftaid" className="text-xs uppercase tracking-widest">

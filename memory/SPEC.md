@@ -51,6 +51,13 @@ The chosen condition is saved onto the inventory item. Each appraisal also retur
 `resale_blurb` — a ready-to-paste eBay/Vinted listing description drafted by Gemini in the same call,
 stored on the item.
 
+## Appraisal response parsing (grounded Gemini)
+`POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the
+model wrap its JSON in citation prose or code fences. `_parse_appraisal()` in
+`routers/appraise.py` strips fences, then tries a brace-span slice, then a balanced-brace scan. If the
+grounded reply still yields no JSON object the route retries **once ungrounded** before returning 502
+("AI returned an unreadable response"). A grounded call that *throws* also retries ungrounded.
+
 ## Electrical items & PAT gate
 During appraisal Gemini flags likely electrical appliances (`is_electrical`); the Appraise panel shows
 an "Electrical item" toggle the volunteer can override, saved onto the item. On the Tag page an
