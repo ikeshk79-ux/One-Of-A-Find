@@ -253,6 +253,7 @@ class SessionInfo(BaseModel):
     color: str | None = None  # roster tile colour
     avatar: str | None = None  # roster tile photo (base64 data URL), optional
     token: str | None = None  # raw session token, returned only to native (Bearer) clients on login
+    csrf: str | None = None  # CSRF double-submit token echoed in-body for cookie-restricted iframes
 
 
 class RosterEntry(BaseModel):

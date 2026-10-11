@@ -52,6 +52,7 @@ export interface SessionInfo {
   color?: string | null; // roster tile colour
   avatar?: string | null; // roster tile photo (base64 data URL)
   token?: string | null; // raw session token — only returned to native (Bearer) clients on login
+  csrf?: string | null; // CSRF double-submit token echoed in-body for cookie-restricted iframes
 }
 
 export interface RosterEntry {

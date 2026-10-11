@@ -18,12 +18,53 @@ export class ApiError extends Error {
 
 type JsonBody = unknown;
 
-// The CSRF cookie is set non-HttpOnly by the backend so we can echo it back as a header on
-// every state-changing request (double-submit-cookie defence layered on SameSite=lax).
-function csrfToken(): string | null {
+// CSRF token source of truth, in order of preference:
+//   1. sessionStorage ("ooaf_csrf") — populated by the auth router (/auth/login, /register, /me)
+//      returning the token in the response body. Needed because embedded preview iframes may
+//      partition the ooaf_csrf cookie out of document.cookie entirely (Chrome's third-party
+//      cookie policy), while still sending it to the server on same-origin fetches.
+//   2. document.cookie fallback — the classic double-submit path for a first-party context.
+const CSRF_STORAGE_KEY = "ooaf_csrf";
+
+export function setStoredCsrfToken(token: string | null | undefined): void {
+  if (typeof sessionStorage === "undefined") return;
+  if (token) sessionStorage.setItem(CSRF_STORAGE_KEY, token);
+}
+
+export function clearStoredCsrfToken(): void {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(CSRF_STORAGE_KEY);
+}
+
+function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|; )ooaf_csrf=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+function csrfToken(): string | null {
+  if (typeof sessionStorage !== "undefined") {
+    const stored = sessionStorage.getItem(CSRF_STORAGE_KEY);
+    if (stored) return stored;
+  }
+  return readCookieToken();
+}
+
+// Response shape of /auth/login, /auth/register and /auth/me — kept here (not re-exported from
+// types.ts) so we only touch it when the auth router changes.
+type AuthResponseLike = {
+  csrf?: string | null;
+};
+
+function captureCsrfFromAuthResponse(path: string, data: unknown): void {
+  // Only auth endpoints echo the token in the body. Other endpoints must not have their
+  // responses sniffed for a `csrf` key.
+  if (!path.startsWith("/auth/")) return;
+  if (!data || typeof data !== "object") return;
+  const csrf = (data as AuthResponseLike).csrf;
+  if (typeof csrf === "string" && csrf.length > 0) {
+    setStoredCsrfToken(csrf);
+  }
 }
 
 async function request<T>(method: string, path: string, body?: JsonBody): Promise<T> {
@@ -48,7 +89,9 @@ async function request<T>(method: string, path: string, body?: JsonBody): Promis
   }
 
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const data = (await res.json()) as T;
+  captureCsrfFromAuthResponse(path, data);
+  return data;
 }
 
 // The response type is yours to declare: nothing infers across the Python boundary, so a

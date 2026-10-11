@@ -1,0 +1,34 @@
+{
+  "iteration": 7,
+  "summary": "Retest of the 3-criterion CSRF partitioned-cookie bug-fix acceptance matrix. Added 1 new backend test file (4 tests) proving login/me echo a body-level 'csrf' field that matches the ooaf_csrf cookie and that a header built purely from that body token clears the server's unchanged cookie==header CSRF check, plus a regression test that missing/mismatched headers still 403. Added 1 new named browser check driving the REAL login -> sessionStorage('ooaf_csrf') -> camera/appraise/save -> logout flow end-to-end (real Gemini-backed POST /api/appraise + POST /api/inventory, not mocked), confirming the outgoing POST carries X-CSRF-Token from sessionStorage and succeeds, and that sessionStorage is cleared after logout. Re-ran the full backend pytest suite and 4 previously-passing browser checks (home nav, appraise/save/why-estimate, more-page, finds/legacy-inventory) to confirm no regressions. All new and regression checks passed; one pre-existing, out-of-scope backend test failure (missing /tmp/item.jpg fixture, flagged in iterations 1-6) remains untouched.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, out-of-scope: tests/test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal fails because fixture image /tmp/item.jpg does not exist in this environment. Not part of this iteration's matrix; flagged again for whoever owns that file to provide/generate the fixture image."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "BUG FIX: POST /api/appraise/inventory succeeds through CSRF when ooaf_csrf cookie is partitioned (body/sessionStorage csrf token path works)",
+      "name": "tests/test_tscheck_csrf_body_token.py (4 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/login -> 200, body.csrf non-empty and byte-equal to Set-Cookie ooaf_csrf value; all other SessionInfo fields (authenticated, username, is_master, shop, color, avatar, token) present and correct. GET /api/auth/me with session+csrf cookies -> 200, body.csrf == cookie value. POST /api/inventory using X-CSRF-Token built exclusively from the login-response body (never read from a cookie jar) with matching cookies attached -> 201 {id,...}; DELETE -> 204. Regression: POST /api/inventory with session cookie but NO X-CSRF-Token -> 403; with a wrong X-CSRF-Token -> 403. All 4 tests passed."
+    },
+    {
+      "criterion": "BUG FIX (frontend): Browser-side POST goes through after login - sessionStorage populated from login response body and sent as X-CSRF-Token; cleared on logout",
+      "name": "login-populates-csrf-sessionstorage",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Signed in as master; captured POST /api/auth/login response body - csrf field non-empty. sessionStorage.getItem('ooaf_csrf') equals that body csrf value. Drove the real camera(canvas mock)->appraise->save flow on /scan: intercepted outgoing POST /api/inventory request headers - X-CSRF-Token present and non-empty; backend responded 201 and success-moment card appeared (not 403). Test-created inventory row deleted via API. Navigated to /more, clicked more-signout; unlock-manager-signin reappeared and sessionStorage.getItem('ooaf_csrf') was null post-logout. Re-ran once against the public preview URL (https://thrift-vision.preview.emergentagent.com) - passed."
+    },
+    {
+      "criterion": "Regression: all previously-passing lanes still pass after the fix",
+      "name": "full backend pytest suite + 4 re-run browser checks (home-to-scan-bottom-nav, appraise-save-success-moment-and-why-estimate, more-page-theme-mission-shortcuts, finds-filters-and-legacy-inventory-route)",
+      "lane": "backend+browser",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 27 passed, 1 pre-existing out-of-scope failure (fixture image missing, unrelated to this matrix). Backend contract test (test_tscheck_backend_contract_v2.py) confirms auth/login still returns authenticated/username/is_master/shop/color/avatar/token plus the new csrf field, security headers, CORS and CSRF-block behavior unchanged. All 4 re-run browser checks passed with no new console errors, confirming home nav, real appraise/save/why-estimate flow, more-page theme/mission/shortcuts, and finds/legacy-inventory route are unaffected by the CSRF fix."
+    }
+  ]
+}

@@ -89,7 +89,11 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     )
     tok = await create_session(username, False)
     _set_cookie(response, tok)
-    set_csrf_cookie(response, new_csrf_token())
+    # Also mint + expose the CSRF double-submit token in the response body: embedded preview
+    # iframes may partition the ooaf_csrf cookie out of document.cookie, so the frontend keeps
+    # a sessionStorage fallback populated from this field.
+    csrf_tok = new_csrf_token()
+    set_csrf_cookie(response, csrf_tok)
     # `?token=true` (native mobile) also returns the raw session token to send as a Bearer
     # header; web clients omit it and keep using the HttpOnly cookie only.
     return SessionInfo(
@@ -99,6 +103,7 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
         color=color,
         avatar=avatar,
         token=tok if token else None,
+        csrf=csrf_tok,
     )
 
 
@@ -115,7 +120,8 @@ async def login(body: LoginRequest, response: Response, token: bool = False):
     await log_activity(username, "logged_in", details={"master": is_master})
     tok = await create_session(username, is_master)
     _set_cookie(response, tok)
-    set_csrf_cookie(response, new_csrf_token())
+    csrf_tok = new_csrf_token()
+    set_csrf_cookie(response, csrf_tok)
     return SessionInfo(
         authenticated=True,
         username=username,
@@ -123,6 +129,7 @@ async def login(body: LoginRequest, response: Response, token: bool = False):
         color=user.get("color") or default_avatar_color(username),
         avatar=user.get("avatar"),
         token=tok if token else None,
+        csrf=csrf_tok,
     )
 
 
@@ -138,8 +145,10 @@ async def me(
         return SessionInfo(authenticated=False)
     # Bootstrap a CSRF token only for cookie (web) sessions that lack one; do NOT rotate an
     # existing token, and skip entirely for Bearer (mobile) auth which needs no CSRF cookie.
+    csrf_tok = ooaf_csrf
     if ooaf_session and not ooaf_csrf:
-        set_csrf_cookie(response, new_csrf_token())
+        csrf_tok = new_csrf_token()
+        set_csrf_cookie(response, csrf_tok)
     uname = sess.get("username")
     user = await db.users.find_one({"username": uname}, {"_id": 0, "color": 1, "avatar": 1}) or {}
     return SessionInfo(
@@ -148,6 +157,9 @@ async def me(
         is_master=bool(sess.get("is_master")),
         color=user.get("color") or (default_avatar_color(uname) if uname else None),
         avatar=user.get("avatar"),
+        # Echo the CSRF token in the body so cookie-partitioned iframes can keep a sessionStorage
+        # fallback populated after a page reload — only for web (cookie) sessions.
+        csrf=csrf_tok if ooaf_session else None,
     )
 
 
