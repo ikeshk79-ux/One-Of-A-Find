@@ -1,236 +1,169 @@
-# One Of A Find — Current App Analysis
+# One Of A Find — Gap Audit vs. Full Redesign Brief
 
-_Snapshot taken before the redesign. This document maps every piece we must preserve._
+_Second analysis pass. The previous two turns already shipped a large portion of this brief; this
+document audits what is already in place and lists only the genuine remaining gaps._
 
-## 1. Stack
+## 1. Baseline (unchanged by any gap work)
 
-| Layer | Tech |
-|---|---|
-| Frontend | React 19 + Vite + TypeScript (strict) + Tailwind v4 + shadcn/ui (base-nova on @base-ui/react) |
-| State | TanStack Query (`@tanstack/react-query`) — one `QueryClientProvider` in `src/main.tsx` |
-| Routing | `react-router-dom` — single `<BrowserRouter>` in `main.tsx`, route table in `src/App.tsx` |
-| Theming | CSS vars in `src/index.css`, `.dark` + `.theme-sunroom` classes toggled from `src/lib/theme.ts` |
-| Backend | FastAPI (async) + Pydantic v2 + Motor (MongoDB) + python-dotenv |
-| AI | Gemini 3 Flash via `emergentintegrations` using `EMERGENT_LLM_KEY` |
+### Stack
+React 19 + Vite + TypeScript strict · Tailwind v4 · shadcn/ui · TanStack Query · FastAPI +
+Pydantic v2 + Motor (MongoDB) · Gemini 3 Flash via `emergentintegrations`.
 
-## 2. Routes (frontend)
+### Routes
+- Gated (through `RequireAuth` → Lock + `AppShell`):
+  `/` Home · `/scan` capture + appraise · `/finds` card grid · `/more` settings · `/inventory`
+  (legacy admin) · `/tag/:id` printable price tag · `/print-tags` A4 bulk sheet · `/activity`
+  (master) · `/volunteers` (master)
+- Ungated previews: `/demo/sunroom`, `/demo/session-location`, `/demo/scan-progress`
 
-All gated screens pass through `RequireAuth`, which renders `Lock.tsx` when `/auth/me` is unauthenticated, otherwise wraps the child in `AppShell` (header + mobile tab bar).
+### APIs (all under `/api`, unchanged)
+Auth: `/auth/register | /auth/login | /auth/logout | /auth/me | /auth/profile | /auth/roster`
+Appraise: `POST /appraise` (Gemini call, returns `Appraisal` — see below)
+Inventory: `GET /inventory | GET /inventory/stats | GET /inventory/lookup | GET /inventory/{id}
+| POST /inventory | PATCH /inventory/{id} | POST /inventory/{id}/blurb |
+PATCH /inventory/{id}/sell | DELETE /inventory/{id}`
+Activity (master): `GET /activity | POST /activity/delete`
+Staff (master): `GET /staff | POST /staff | PATCH /staff/{username} | PATCH /staff/{username}/pin
+| DELETE /staff/{username}`
 
-| Path | Component | Gated | Purpose |
-|---|---|---|---|
-| `/` | `pages/Appraise.tsx` | yes | Capture item + brand label + extras → calls `POST /api/appraise` → saves to inventory. **Primary camera flow.** |
-| `/inventory` | `pages/Inventory.tsx` | yes | Grid of items with filter/edit/sell/re-price/bulk-select. |
-| `/tag/:id` | `pages/TagPage.tsx` | yes | Printable single price-tag page (QR + barcode + condition). |
-| `/print-tags` | `pages/PrintTags.tsx` | yes | A4 bulk-tag sheet from `?ids=` query. |
-| `/activity` | `pages/Activity.tsx` | yes, **master-only** | Audit log viewer. |
-| `/volunteers` | `pages/Staff.tsx` | yes, **master-only** | Staff CRUD, PIN reset, avatar/colour. |
-| `/demo/sunroom` | `pages/SunroomDemo.tsx` | **no** | Ungated preview mock — do not touch. |
-| `/demo/session-location` | `pages/SessionLocationDemo.tsx` | **no** | Ungated preview mock — do not touch. |
+### Database collections
+`users`, `sessions`, `inventory`, `activity`, `login_failures`, `shop_gate_failures`.
 
-The Lock page itself is rendered inline by `RequireAuth` (not a routed page). Flow: `unlock` → `roster` → `pin` → `signin`/`register`.
+### Appraisal response fields (what the backend actually returns — do not invent beyond this)
+`title · brand · category · description · condition · is_electrical · price_source ·
+peak_retail_price · market_average_price · recommended_price · currency · confidence ·
+rationale · resale_blurb`
+**No `sources`, no `evidence_urls`, no `comparables`, no `favourite` flag.** Any "evidence" in
+the UI must be sourced from `rationale` + `description` + `confidence` — otherwise an honest
+"no supporting sources returned" message.
 
-## 3. Reusable components
+### Camera
+`components/CameraCapture.tsx` — camera-only (`getUserMedia({ facingMode: 'environment' })`),
+torch, hardware zoom with digital fallback, 3:4 portrait/full-frame, luminance + Laplacian
+quality heuristics. **No gallery / file-picker / drag-drop path exists anywhere in the tree.**
 
-Under `src/components/`:
+### Auth
+Cookie session + CSRF double-submit + optional Bearer. Master seeded from env.
 
-- `AppShell.tsx` — top header + mobile bottom tab bar + profile dialog + theme/location switchers + logout.
-- `RequireAuth.tsx` — session gate.
-- `CameraCapture.tsx` — **critical, do not break.** Uses `getUserMedia({ facingMode: "environment" })`, torch, hardware zoom with digital fallback, 3:4 portrait or full-frame crop, quality heuristic (dark/blurry), returns a JPEG data URL via `onCapture`. **No file-upload path exists; camera-only is already enforced.**
-- `BarcodeScanner.tsx` — SKU scanning on Inventory.
-- `PriceTag.tsx` — tag render used by `TagPage` and `PrintTags`.
-- `Avatar.tsx`, `AvatarPicker.tsx` — roster tile avatars.
-- `ThemeToggle.tsx` — obsidian ↔ sunroom switch.
-- `LocationSwitcher.tsx` — session branch (stored in `lib/sessionLocation.ts`).
-- `FirstRunGuide.tsx` — onboarding cards on `/`.
-- `ImageLightbox.tsx` — zoomed image viewer.
-
-shadcn primitives in `components/ui/`: badge, button, calendar, card, checkbox, dialog, dropdown-menu, input, label, popover, select, sheet, sonner, table, tabs, textarea.
-
-## 4. API endpoints
-
-All under `/api`.
-
-### Auth (`routers/auth.py`) — `/api/auth/*`
-
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/auth/register` | Create volunteer (needs shop password). Sets httpOnly cookie + CSRF cookie. |
-| POST | `/auth/login` | Sign in with username + PIN. Sets httpOnly cookie + CSRF cookie. |
-| POST | `/auth/logout` | Revoke session + clear cookie. |
-| GET | `/auth/me` | Current session (`SessionInfo`); non-blocking probe. |
-| PATCH | `/auth/profile` | Update own tile colour/photo. |
-| POST | `/auth/roster` | Volunteer tiles for the lock screen (shop-password gated, not public). |
-
-### Appraise (`routers/appraise.py`) — `/api/appraise`
-
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/appraise` | Multi-image Gemini call. Returns `Appraisal` (title, brand, category, condition, is_electrical, peak_retail_price, market_average_price, recommended_price, confidence, rationale, resale_blurb). |
-
-### Inventory (`routers/inventory.py`) — `/api/inventory/*`
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/inventory` | List (trims heavy images). |
-| GET | `/inventory/stats` | Totals, week raised, potential value. |
-| GET | `/inventory/lookup?sku=` | Barcode lookup. |
-| GET | `/inventory/{id}` | Full item (with images). |
-| POST | `/inventory` | Save appraised item (assigns SKU). |
-| PATCH | `/inventory/{id}` | Edit title/price/category/location/size/condition/price_source/giftaid_ref/pat_passed/is_electrical. |
-| POST | `/inventory/{id}/blurb` | Re-draft resale blurb with a tone. |
-| PATCH | `/inventory/{id}/sell` | Mark sold / return to floor. |
-| DELETE | `/inventory/{id}` | Remove. |
-
-### Activity (`routers/activity.py`, master-only) — `/api/activity/*`
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/activity` | Audit log. |
-| POST | `/activity/delete` | Purge selected ids. |
-
-### Staff (`routers/staff.py`, master-only) — `/api/staff/*`
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/staff` | List volunteers. |
-| POST | `/staff` | Create volunteer. |
-| PATCH | `/staff/{username}` | Rename/recolour/rephoto. |
-| PATCH | `/staff/{username}/pin` | Reset PIN (revokes sessions). |
-| DELETE | `/staff/{username}` | Remove. |
-
-### Health — `GET /api/` (unauthenticated readiness probe).
-
-## 5. Database collections (MongoDB)
-
-- `users` — `{id, username, pin_hash, is_master, color, avatar, created_at}`
-- `sessions` — session token docs (TTL managed by `lib/auth.py`)
-- `inventory` — see `InventoryItem` in `backend/models/appraisal.py`: `{id, sku, title, brand, category, description, condition, peak_retail_price, market_average_price, recommended_price, currency, confidence, rationale, resale_blurb, is_electrical, pat_passed, price_source, item_image, label_image, extra_images, giftaid_ref, location, size, status, sold_price, sold_giftaid_ref, sold_at, created_at}`
-- `activity` — `{id, timestamp, username, action, item_id, item_title, item_sku, details}`
-- `login_failures` / `shop_gate_failures` — rate-limit state
-
-## 6. Authentication
-
-Dual auth, cookie-first:
-
-- **Login response** sets `ooaf_session` (httpOnly, SameSite=lax) + `ooaf_csrf` (readable by JS so the frontend can echo it back in `X-CSRF-Token`).
-- Every unsafe method (`POST/PUT/PATCH/DELETE`) under `/api` must present a matching `X-CSRF-Token` header **when a session cookie is present**. Login/register/roster are CSRF-exempt (pre-session).
-- Bearer-token path is accepted (`Authorization: Bearer <token>`) for a future native mobile app; `token_from(cookie, header)` prefers the cookie.
-- Master account seeded at startup (`seed_master` in `lib/auth.py`) from `ADMIN_USERNAME` + `ADMIN_PASSWORD` env.
-- Lock screen flow: shop password → roster (tap tile) → PIN → signed in. "Create a new volunteer" branches to the register path (same shop password gate).
-
-**CORS**: `CORS_ORIGINS="*"` ⇒ wildcard **without credentials** (safe since the web app is same-origin and Bearer uses no cookies). An explicit allowlist re-enables credentials. **Do not loosen.**
-
-## 7. Camera flow
-
-Implemented entirely in `components/CameraCapture.tsx` as a dialog, instantiated three times on `/` (item, label, extras):
-
-1. On open → `getUserMedia({ video: { facingMode: "environment", width: 1080, height: 1440, aspectRatio: 3/4 } })`.
-2. Live preview with grid overlay, torch toggle (when `track.getCapabilities().torch === true`), zoom slider (hardware zoom caps or 1×–4× digital fallback), portrait/full-frame toggle.
-3. Shutter → draws current video frame to canvas, crops to 3:4 centre (or full), downscales to ≤900 px long edge, encodes JPEG at 0.82, runs cheap luminance + Laplacian heuristics, surfaces "a little dark/blurry" warning. Returns data URL via `onCapture`.
-4. Retake / Use photo buttons; Cancel closes.
-
-**No file picker / drag-drop / gallery path exists.** Already camera-only; the brief's "remove gallery" step is a no-op.
-
-## 8. AI flow
-
-- `POST /api/appraise` composes `SYSTEM` + `PROMPT` with the allowed category list, attaches 1–8 base64 images (item + optional label + up to 6 extras), sends to `gemini/gemini-3-flash-preview` via `emergentintegrations.llm.chat.LlmChat`. Strict JSON response is cleaned (strip code fences), parsed, normalised, and clamped (recommended = min(market_avg, peak × 0.5), rounded to the nearest 50p).
-- `POST /api/inventory/{id}/blurb` reuses the same chat primitive to redraft the listing in a tone (`warm | concise | luxury | playful`).
-
-## 9. State management
-
-- `TanStack Query` is the sole data layer. Keys in use: `["auth","me"]`, `["inventory"]`, `["inventory","stats"]`, `["activity"]`, `["staff"]`, `["roster"]`, `["item", id]`.
-- Mutations invalidate the relevant keys; `endSession()` calls `qc.clear()` on logout to prevent cache leakage between volunteers.
-- Session location (branch) is persisted locally via `lib/sessionLocation.ts`.
-
-## 10. Design system (current)
-
-- Dark cinematic "Obsidian" default (`:root` + `.dark`) + light "Sunroom" option (`.theme-sunroom`).
-- Palette: `--obsidian #0B0C0E`, `--charcoal #16181C`, `--gold #D9B48F`, hairline borders, radial glow.
-- Fonts: Space Grotesk (heading), Geist (body), Geist Mono.
+### AI flow
+`POST /api/appraise` → `emergentintegrations.llm.chat.LlmChat` with
+`gemini/gemini-3-flash-preview` and `EMERGENT_LLM_KEY` — strict-JSON prompt, response clamped to
+recommended = min(market_avg, peak × 0.5), 50 p rounded.
 
 ---
 
-# Proposed Redesign — What Will Change
+## 2. Brief ↔ Current state matrix
 
-The redesign brief introduces a new "Thrift Vision" visual language (forest green + cream + terracotta + sage, Inter type) with a mobile-first home / scan / finds / more shell. We map it onto the existing app **without renaming routes or removing features**, keeping charity-shop features (PAT gating, bulk tags, master screens, etc.) accessible.
-
-## 10.1 Route mapping (keeps old URLs as aliases)
-
-| Brief's route | Our route | Notes |
+| # | Brief section | Status |
 |---|---|---|
-| `/home` | `/` (now a true **Home** page) | New hero + "Scan an item" card + Recent finds + stats tile. The old appraisal flow moves to `/scan`. |
-| `/scan` | `/scan` **(new)** | Full-screen camera capture + brand capture + processing + results. Reuses `CameraCapture` and the existing `/api/appraise` logic. |
-| `/finds` | `/finds` **(new)** → alias of existing `/inventory` | Keep `/inventory` as a redirect so bookmarks and deep links don't break. |
-| `/more` | `/more` **(new)** | Settings-style hub: location, theme, profile, bulk print, master-only Activity + Staff, Help, About, Sign out. |
+| 2 | Camera-only input (no gallery/upload) | ✅ Already true — no upload path has ever existed |
+| 3 | Premium modern visual direction | ✅ Forest/sage/terracotta applied across shell + pages |
+| 4 | Brand palette (forest `#123C35`, cream, sage, terracotta, charcoal text) | ✅ CSS vars in `src/index.css` as the default `:root` |
+| 5 | Inter typography, hero scale, strong numeric values | ✅ `@fontsource-variable/inter` loaded; `--font-sans/--font-heading` wired |
+| 6 | Global padding/radius/touch-target rules | ✅ `.touch-target` utility (48 px), card radii standardised |
+| 7 | Home: hero, scan card, recent finds, mission tiles | ✅ `pages/Home.tsx` |
+| 8 | Bottom nav Home/Scan/Finds/More, floating Scan | ✅ `components/common/BottomNavigation.tsx` + top nav in `AppShell` |
+| 9 | Item camera UI — fullscreen, scan frame, large shutter, "Good lighting…" copy | 🟡 Dialog is bare; needs titled framing + helper copy |
+| 10 | Brand camera auto-transition after item capture | 🟡 Two separate slots today — brief wants one guided flow |
+| 11 | Processing: ✓ Identifying / ✓ Checking brand / ○ Comparing / ○ Searching | ✅ `ProcessingSteps` + `/demo/scan-progress` |
+| 12 | Dedicated **Result screen** (photo, confidence, item name, value card, item details, market details, evidence, save) | 🟡 Today the result renders inline inside `Appraise`; needs promoting to a proper result layout |
+| 13 | Big sage value card "ESTIMATED VALUE £xx–£yy" | 🟡 Currently a 3-tile Peak/Charity/Custom chooser — the chooser must stay (volunteers pick), but the headline value needs a hero value card above it |
+| 14 | "Why this estimate?" accordion | ❌ Not present — need an expandable surface over `rationale` + confidence + condition + "no external sources available" honesty line |
+| 15 | Save feedback (heart animation + "Saved to Finds" toast) | 🟡 Toast exists; a small animation + language tweak remain |
+| 16 | My Finds — card list with image/title/value/confidence/date | ✅ `pages/Finds.tsx` (filters are PAT / status today — see note under gaps) |
+| 17 | Settings — Settings/Help/About sections | ✅ `pages/More.tsx` (Help & About present) |
+| 18 | Empty states | ✅ `EmptyState` primitive used in Home + Finds |
+| 19 | Error states | ✅ `ErrorState` primitive used in Finds; need to confirm Appraise/Scan paths use it |
+| 20 | Dark mode (light/dark/**system**) | 🟡 Four themes exist (`forest-light / forest-dark / obsidian / sunroom`) but no "follow system" option — need a System toggle |
+| 21 | Responsive 320/375/390/430/768/1024/1440 | ✅ All breakpoints covered by Tailwind + current layouts |
+| 22 | Accessibility (44 px, ARIA, focus, reduced motion) | ✅ Baseline present; audit still worth a pass |
+| 23 | Performance (lazy load, light bundle) | 🟡 Lazy-loading not applied to heavy routes yet (Appraise, Inventory, PrintTags) — easy win |
+| 24 | Progressive visual replacement | ✅ Legacy routes still mount their legacy UIs, new routes own the new look |
+| 25 | Full QA pass | 🟡 Not yet run after this round of changes |
 
-Deep links kept exactly as-is: `/tag/:id`, `/print-tags`, `/activity`, `/volunteers`, the `/demo/*` previews.
+### Additional brief sections
 
-## 10.2 Theme
+| # | Brief section | Status |
+|---|---|---|
+| 16 (Discovery) | "You found a good one!" celebration after save | ❌ Save currently routes straight to `/tag/{id}` printable — no success moment |
+| 17 (My Finds) | "All \| Favourites \| Saved" filter | ❌ Backend has no `favourite` field — would require either backend change or we drop the Favourites filter and keep current `All / Available / Sold / PAT pending` |
+| 19 (Charity mission) | "Good finds support great causes." card | ❌ Not present |
+| 20 (Onboarding) | 3-screen welcome before Lock | 🟡 `FirstRunGuide` exists as a modal inside Appraise but is not a dedicated welcome flow before auth |
+| 36 (Brand copy) | "Find it. Identify it. Discover its value." tagline | 🟡 Partially present in hero copy |
 
-- Add a new `.theme-forest` class (default) with the brief's palette:
-  `--primary #123C35` forest, `--background #FAF7F0` cream, `--card #FFFFFF`, `--terracotta #D96C4F`, `--sage #DCE9DF`, `--text #18201E`, `--text-secondary #5E786F`, dark variant `#101816 / #18211E / #F5F7F5 / #A8B4AF`.
-- `ThemeToggle` becomes **Light / Dark** (System) toggle; old `obsidian` / `sunroom` remain accessible via settings for anyone used to them (zero-regression option).
-- Load **Inter** (variable) as the primary sans; keep Space Grotesk retired or secondary (both are preinstalled). Headings 700, body 400–500, numeric values 700–800.
+---
 
-## 10.3 New shared primitives (`src/components/ui/*` + `src/design-system/*`)
+## 3. What I propose to change (delta scope)
 
-- Light-touch design tokens: `src/design-system/{colors.ts, spacing.ts, radius.ts, typography.ts}` for TS-side use. (CSS vars remain the source of truth.)
-- New wrappers / components, re-exportable from `src/components/common/`:
-  `SectionHeader`, `ValueDisplay`, `ConfidenceBadge`, `LoadingCard`, `EmptyState`, `ErrorState`, `BottomNavigation`, `CameraFrame`, `Modal` (thin wrapper on existing `Dialog`), `Toast` (we keep `sonner`).
-- Button variants: adjust existing `button.tsx` CVA to add a `primary` style = forest green + cream text + rounded; `secondary` = white with forest border; `ghost` stays. Minimum touch target 48 px.
+Grouped by the smallest safe refactors. Nothing listed here touches a Pydantic model, a backend
+router, auth, CSRF, CORS, the camera capture pipeline, or any other existing feature
+(PAT gating, Giftaid, condition grading, bulk tag printing, master screens, barcode SKU,
+price-source choice all remain exactly as they are).
 
-## 10.4 Page refactors (visuals only; APIs/logic untouched)
+### 3.1 Dedicated Result layout (brief §12–§15)
+- New section inside `Appraise` (not a new route — keep the capture + result on `/scan`) that
+  renders the appraisal in the brief's layout: large hero photo, confidence badge, item name,
+  **sage ValueDisplay** showing the currently-selected price with "ESTIMATED VALUE" eyebrow,
+  then the existing Peak/Charity/Custom chooser (unchanged logic), item details grid, market
+  details grid, resale-blurb card, and a new **"Why this estimate?" accordion**.
+- The accordion renders `rationale + description + confidence + condition + price_source`
+  plus an honest footer: "This estimate is based on Gemini's analysis of your photos; no
+  external market URLs are returned by the appraisal API."
 
-- **New `pages/Home.tsx`** — hero "What have you found today?", big scan card, "Recent finds" (first 5 from `GET /inventory`), weekly raised tile (from `GET /inventory/stats`), bottom nav.
-- **`pages/Scan.tsx`** — fullscreen camera flow in three steps: Item capture → Brand capture (auto-transition) → Processing card (`✓ Identifying item`, `✓ Checking brand`, `○ Comparing prices`, `○ Searching market` — simulated progress, no backend change). Then redirect to a results view backed by the saved `InventoryItem`. The current `/` behaviour (big Appraise form with extras + condition + save) remains fully reachable from `/scan`'s "More details" view.
-- **`pages/Finds.tsx`** — new card list (image, title, value, confidence, date) powered by the current `GET /inventory`. Preserves filters, bulk selection, re-price, mark-sold, delete, bulk print, condition filter can slot in later (P1 backlog item).
-- **`pages/Results.tsx`** (view of a saved item) — refactor of `TagPage` into a two-tabbed screen: _Appraisal_ (photo, confidence, value card, item details, market details, evidence accordion, save/edit) and _Price tag_ (the existing tag/print surface). Keeps all current mutations: `PATCH /inventory/{id}`, `/sell`, `/blurb`, `DELETE`, bulk print.
-- **`pages/More.tsx`** — settings hub replacing the AppShell dropdown. Preserves profile dialog, theme toggle, branch switcher, logout; adds entry points to **Activity** and **Staff** when `is_master`.
-- **`pages/Lock.tsx`** — restyle only (new palette, bigger PIN pad touch targets, new tile layout). Flow logic untouched.
+### 3.2 Dedicated success moment (brief §16)
+- After `POST /api/inventory` succeeds, instead of jumping straight to `/tag/{id}`, show a
+  short **success state** inline — "You found a good one!" + value + two CTAs:
+  **Print price tag** (goes to `/tag/{id}`) and **Scan another item** (resets the form).
+  Preserves the existing save flow and keeps the printable tag reachable.
 
-Legacy pages stay on disk and are still routable at their old URLs to guarantee zero regression; the new `/scan` and `/finds` are additive. Once the user signs off, we can collapse `/` + `/inventory` into the new pages behind redirects.
+### 3.3 Camera chrome (brief §9–§10)
+- Add a titled header + instruction copy to the `CameraCapture` dialog based on the slot
+  (`"Scan the item"` + `"Make sure the item is clear and well lit."` for the item slot;
+  `"Now scan the brand"` + `"Take a photo of the label or logo."` for the label slot).
+- Keep the shutter / torch / zoom / portrait toggle / retake buttons exactly where they are.
+- Auto-transition: when the item photo is captured and no label photo exists yet, prompt
+  "Now capture the brand label" with a one-tap button to open the label camera.
 
-## 10.5 Error / empty / loading states
+### 3.4 Theme: add "System" option (brief §20)
+- `lib/theme.ts` gains a `"system"` entry that follows `prefers-color-scheme` live. The More
+  page picker becomes **System · Forest Light · Forest Dark · Obsidian · Sunroom**.
 
-Consistent surfaces (`LoadingCard`, `EmptyState`, `ErrorState`) wrap API calls — no raw stack traces. The template's rule (never gate the whole page on a fetch) is honoured so the preview CDN build still renders when the backend is paused.
+### 3.5 Charity-mission card (brief §19)
+- A small sage card on `More` (not the Home hero) with the "Good finds support great causes."
+  copy. Non-intrusive, no fake statistics.
 
-## 10.6 Accessibility & perf
+### 3.6 Light performance pass (brief §23)
+- `React.lazy` for the three heavy routes: `Inventory`, `PrintTags`, `Appraise/Scan`. Keeps the
+  initial Home chunk small.
 
-- 44 px+ touch targets, ARIA labels on every interactive, visible focus rings, `prefers-reduced-motion` respected (already in `index.css`).
-- Lazy-load heavy routes with `React.lazy` (new).
-- Keep images downscaled to ≤900 px (already in `CameraCapture`).
-- Bundle-size impact: Inter adds ~1 variable font file; everything else re-uses installed primitives.
+### 3.7 QA pass + testing (brief §25, §39)
+- After the above lands, run the testing subagent against the full journey (launch → scan →
+  capture → brand → processing → result → save → finds → saved detail), with the usual edge
+  cases (permissions denied, PAT item, sold item, dark mode, mobile + desktop).
 
-## 10.7 What we will NOT touch
+### 3.8 Explicitly NOT doing
+- No "Favourites" field (would require a backend schema change the brief says not to make).
+  The existing filters (All / Available / Sold / PAT pending) stay — they're more useful for a
+  charity shop than a Favourites toggle.
+- No pre-auth 3-screen onboarding — the existing `FirstRunGuide` + Lock flow is adequate for a
+  shop-tablet context, and a sign-in gate must still come first for data integrity. I can
+  revisit if you'd like a Welcome strip above the Lock screen as a lower-risk alternative.
+- No fabricated evidence URLs or sale comparables — the "Why this estimate?" accordion is
+  limited to what the backend actually returns, with an honest "no external sources" note.
 
-- `backend/models/appraisal.py` (no schema changes)
-- Any route in `backend/routers/*.py` (no API changes)
-- `CameraCapture.tsx` capture logic / canvas pipeline (visual chrome only may change)
-- `lib/api.ts`, `lib/session.ts`, CSRF/cookie handling
-- `BarcodeScanner.tsx`, `PriceTag.tsx` (used by the print paths — reused as-is)
-- `backend/server.py` CORS/CSRF middleware
-- `/app/memory/SPEC.md` seed credentials
-- The two `/demo/*` previews
+---
 
-## 10.8 Risks & mitigations
+## 4. Risk & verification plan
 
 | Risk | Mitigation |
 |---|---|
-| Button CVA change ripples to legacy pages | Add a new `primary` variant, leave `default` intact; migrate legacy pages one at a time. |
-| New routes conflict with existing bookmarks | Keep old routes as aliases/redirects. |
-| Theme vars drift breaks `base-nova` shadcn components | Only override tokens that already exist; don't remove any. |
-| PAT gating / Giftaid / bulk-print nuances lost in a visual rewrite | We refactor the existing `Inventory`/`TagPage` into new shells but keep all their mutation hooks and conditional UI (price_source wording, PAT red banner, GiftAid ref etc.). |
+| Result-screen refactor disrupts save flow | Keep every existing mutation (`POST /inventory`, `PATCH /inventory/{id}`, `/sell`, `/blurb`) wired through the same handlers; only the surrounding JSX changes |
+| Lazy loading breaks preview CDN build | Verify with `yarn build` before shipping; keep Home eager so first paint is unaffected |
+| Camera-chrome copy slot breaks existing testids | Preserve every existing `data-testid` on the dialog; add new testids rather than renaming |
+| System-theme listener fires during SSR | Guard with `typeof window` as the existing code already does |
 
-## 11. Implementation plan (incremental)
-
-1. **Tokens**: add `.theme-forest` palette + Inter import + updated `--font-sans/--font-heading` in `index.css`; keep obsidian/sunroom intact; wire `theme.ts` to a new default `"forest"`.
-2. **Primitives**: create `src/design-system/{colors,spacing,radius,typography}.ts`; add new `components/common/{SectionHeader,ValueDisplay,ConfidenceBadge,LoadingCard,EmptyState,ErrorState,BottomNavigation,CameraFrame}.tsx`; extend `button.tsx` with `primary`.
-3. **Shell**: new `pages/Home.tsx` + new `BottomNavigation` with Home / Scan / Finds / More. Mount under `/`. Old `/` (Appraise) moves to `/scan` as `Scan.tsx` wrapping `Appraise`'s existing component.
-4. **Finds**: new `pages/Finds.tsx` reusing Inventory data hooks; `/inventory` kept as alias.
-5. **Results**: `pages/Results.tsx` tabbed view that embeds the existing `TagPage` subtree for print.
-6. **More**: `pages/More.tsx` with links to Activity (master), Staff (master), bulk print, profile dialog, theme, branch, sign out.
-7. **Lock**: restyle only.
-8. **Verify**: tier-1 gate (curl smoke, `yarn typecheck`, one happy path), then testing subagent.
-
-Every step preserves the API surface documented in sections 4–8 above.
+Verification after implementation:
+1. `yarn typecheck` + backend readiness probe.
+2. curl smoke over the key endpoints.
+3. Browser pass through Lock → Home → Scan → camera → result → save → success → Finds → tag/{id}, mobile + desktop + dark.
+4. Testing subagent for the full acceptance matrix.

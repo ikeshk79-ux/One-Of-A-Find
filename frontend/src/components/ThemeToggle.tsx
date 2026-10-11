@@ -1,18 +1,25 @@
 import { useState } from "react";
-import { Moon, Palette, Sun } from "lucide-react";
+import { Monitor, Moon, Palette, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getTheme, setTheme, type ThemeName } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-// Lightweight cycle button for the top bar: forest-light → forest-dark → obsidian → sunroom → forest-light.
+// Lightweight cycle button for the top bar: system → forest-light → forest-dark → obsidian → sunroom → system.
 // The More screen offers an explicit picker; this is the one-tap convenience version.
-const ORDER: readonly ThemeName[] = ["forest-light", "forest-dark", "obsidian", "sunroom"] as const;
+const ORDER: readonly ThemeName[] = [
+  "system",
+  "forest-light",
+  "forest-dark",
+  "obsidian",
+  "sunroom",
+] as const;
 
 const META: Record<ThemeName, { label: string; next: ThemeName; Icon: typeof Sun }> = {
+  system: { label: "System", next: "forest-light", Icon: Monitor },
   "forest-light": { label: "Light", next: "forest-dark", Icon: Sun },
   "forest-dark": { label: "Dark", next: "obsidian", Icon: Moon },
   obsidian: { label: "Obsidian", next: "sunroom", Icon: Palette },
-  sunroom: { label: "Sunroom", next: "forest-light", Icon: Palette },
+  sunroom: { label: "Sunroom", next: "system", Icon: Palette },
 };
 
 export default function ThemeToggle({ className }: { className?: string }) {

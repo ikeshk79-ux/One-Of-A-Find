@@ -23,6 +23,10 @@ import {
 } from "@/components/ui/dialog";
 import CameraCapture from "@/components/CameraCapture";
 import ProcessingSteps from "@/components/common/ProcessingSteps";
+import SuccessMoment from "@/components/common/SuccessMoment";
+import ValueDisplay from "@/components/common/ValueDisplay";
+import ConfidenceBadge from "@/components/common/ConfidenceBadge";
+import WhyThisEstimate from "@/components/common/WhyThisEstimate";
 import { apiPost } from "@/lib/api";
 import { gbp, CATEGORIES, LOCATIONS, sizeOptionsFor, CONDITION_OPTIONS, CONDITION_MULTIPLIERS, adjustedCharityPrice } from "@/lib/types";
 import { getSessionLocation, useSessionLocation } from "@/lib/sessionLocation";
@@ -138,6 +142,7 @@ export default function Appraise() {
   const [condition, setCondition] = useState<string>("Good");
   const [isElectrical, setIsElectrical] = useState(false);
   const [customPrice, setCustomPrice] = useState("");
+  const [savedItem, setSavedItem] = useState<InventoryItem | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   // Show the 3-step tour once for a new volunteer on this device; reopenable via "How it works".
   useEffect(() => {
@@ -211,11 +216,38 @@ export default function Appraise() {
       }),
     onSuccess: async (item) => {
       await qc.invalidateQueries({ queryKey: ["inventory"] });
-      toast.success("Saved to inventory");
-      navigate(`/tag/${item.id}`);
+      await qc.invalidateQueries({ queryKey: ["inventory", "stats"] });
+      toast.success("Saved to Finds");
+      // Celebrate the save inline so volunteers see what they appraised instead of being
+      // whisked straight to the printable tag; the tag + reset flows live on the success card.
+      setSavedItem(item);
+      // Scroll the success card into view on mobile.
+      requestAnimationFrame(() => {
+        document.querySelector('[data-testid="success-moment"]')?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
     },
     onError: () => toast.error("Could not save item"),
   });
+
+  // Full reset — used by the "Scan another item" button on the success card.
+  const resetForNextItem = () => {
+    setSavedItem(null);
+    setResult(null);
+    setItemImage(null);
+    setLabelImage(null);
+    setExtraImages([]);
+    setNotes("");
+    setSize("");
+    setGiftAidRef("");
+    setPriceChoice("charity");
+    setCustomPrice("");
+    setCondition("Good");
+    setIsElectrical(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Gentle nudge: clothing/shoe items should carry a size before they're filed unsized.
   const needsSize = !!sizeOpts && !size;
@@ -242,7 +274,16 @@ export default function Appraise() {
   };
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[1fr_1.05fr]">
+    <div className="space-y-8">
+      {savedItem && (
+        <SuccessMoment
+          item={savedItem}
+          onPrintTag={() => navigate(`/tag/${savedItem.id}`)}
+          onScanAnother={resetForNextItem}
+          onViewFinds={() => navigate("/finds")}
+        />
+      )}
+      <div className="grid gap-10 lg:grid-cols-[1fr_1.05fr]">
       <FirstRunGuide open={guideOpen} onClose={closeGuide} />
       <section>
         <div className="flex items-start justify-between gap-3">
@@ -281,14 +322,45 @@ export default function Appraise() {
           />
         </div>
 
+        {itemImage && !labelImage && !result && (
+          <button
+            type="button"
+            onClick={() => setCamera("label")}
+            data-testid="auto-brand-prompt"
+            className="mt-3 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-left transition-all hover:border-primary/50 hover:bg-primary/10"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+              <Camera className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">
+                Great — now capture the brand label
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                A close-up of the logo or care tag doubles the AI's accuracy.
+              </span>
+            </span>
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-primary">
+              Open →
+            </span>
+          </button>
+        )}
+
         <CameraCapture
           open={camera !== null}
           title={
             camera === "label"
-              ? "Photograph the brand label"
+              ? "Now scan the brand"
               : camera === "extra"
-                ? "Photograph damage or hallmarks"
-                : "Photograph the item"
+                ? "Capture a detail shot"
+                : "Scan the item"
+          }
+          description={
+            camera === "label"
+              ? "Photograph the label, logo or care tag — close enough that the brand name is readable."
+              : camera === "extra"
+                ? "Zoom in on any damage, hallmark or wear point you want recorded."
+                : "Make sure the item is clear and well lit. Good lighting helps us identify it."
           }
           testid="camera"
           onClose={() => setCamera(null)}
@@ -473,6 +545,29 @@ export default function Appraise() {
               {result.description}
             </p>
 
+            {/* Hero value card — the single headline number for the volunteer. */}
+            <div className="mt-6">
+              <ValueDisplay
+                label="Estimated value"
+                value={gbp(chosenPrice)}
+                caption={
+                  priceChoice === "charity"
+                    ? `${condition} condition · ${Math.round((CONDITION_MULTIPLIERS[condition] ?? 1) * 100)}% of guide, rounded to 50p`
+                    : priceChoice === "peak"
+                      ? "Peak RRP — top of market"
+                      : "Volunteer-set price"
+                }
+                tone="sage"
+                testid="result-value-hero"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <ConfidenceBadge confidence={result.confidence} testid="result-confidence-badge" />
+                <span className="text-[11px] text-muted-foreground">
+                  Estimate only — not a guaranteed sale price.
+                </span>
+              </div>
+            </div>
+
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <Stat
                 testid="price-option-peak"
@@ -574,9 +669,15 @@ export default function Appraise() {
               </span>
             </button>
 
-            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-              {result.rationale} · Confidence: {result.confidence} · Estimates only.
-            </p>
+            <div className="mt-5">
+              <WhyThisEstimate
+                rationale={result.rationale}
+                confidence={result.confidence}
+                condition={condition}
+                priceSource={priceChoice}
+                testid="why-this-estimate"
+              />
+            </div>
 
             {result.resale_blurb && (
               <div
@@ -743,6 +844,7 @@ export default function Appraise() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,69 @@
+{
+  "iteration": 6,
+  "summary": "Verified the 8-criterion 'new 4-tab nav / Scan studio / demo progress / More page / Finds page / backend contract / Save success / WhyThisEstimate' acceptance matrix with 1 new backend test file (5 tests) and 6 new named browser checks (one of which legitimately drives the REAL camera -> appraise -> save flow end-to-end using a canvas-based getUserMedia mock, hitting the live Gemini-backed /api/appraise and /api/inventory endpoints, not a UI/data mock). Re-ran one check through the public preview URL. All 8 criteria passed; no application bugs found. One pre-existing, out-of-scope backend test failure (missing /tmp/item.jpg fixture in test_tscheck_appraise_endpoint.py, flagged in prior iterations) remains untouched as it is unrelated to this iteration's matrix.",
+  "passed": 11,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, out-of-scope: tests/test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal fails because fixture image /tmp/item.jpg does not exist in this environment. Not part of this iteration's matrix; flagged again for whoever owns that file to provide/generate the fixture image."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Backend contract preserved: critical endpoints respond correctly",
+      "name": "tests/test_tscheck_backend_contract_v2.py (5 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/ -> 200 {status:ok}; GET /api/auth/me (no cookie) -> 200 {authenticated:false}; POST /api/auth/login (master) -> 200 with Set-Cookie ooaf_session + ooaf_csrf; authenticated GET /api/inventory -> 200 list, /api/inventory/stats -> 200 {week_raised,potential_value,...}, /api/activity -> 200 list, /api/staff -> 200 list; POST /api/inventory with Appraisal payload + tiny base64 PNG item_image -> 201 {id,title,recommended_price:13.0}; GET /api/inventory/{id} -> 200 same id; DELETE -> 204; final GET /api/inventory/{id} -> 404. All 5 tests passed."
+    },
+    {
+      "criterion": "Home -> Scan navigation works with the new 4-tab bottom nav",
+      "name": "home-to-scan-bottom-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Signed in as master via unlock-manager-signin -> username/pin -> auth-submit-button. Home ('/') shows home-scan-card + home-stats; bottom-navigation shows tab-home/tab-finds/tab-more + floating tab-scan. Tapping tab-scan navigated to /scan; scan-hero visible with title 'Point. Shoot. Appraise.' and 3 'Capture tips' hint chips. Re-ran once against the public preview URL (https://thrift-vision.preview.emergentagent.com) - passed."
+    },
+    {
+      "criterion": "Camera dialog shows the new titled headers + instruction copy per slot",
+      "name": "scan-camera-dialog-headers",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /scan, tapping item-photo-slot opened camera-dialog with DialogTitle 'Scan the item' and description 'Make sure the item is clear and well lit. Good lighting helps us identify it.'; camera-cancel closed it. Tapping label-photo-slot showed DialogTitle 'Now scan the brand' and description 'Photograph the label, logo or care tag — close enough that the brand name is readable.'. Both dialogs had camera-cancel + camera-shutter ('Take photo') buttons and zero input[type=file] elements anywhere inside the dialog."
+    },
+    {
+      "criterion": "4-step scan progress animation runs through all four milestones",
+      "name": "scan-progress-demo-four-steps",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Visited /demo/scan-progress (no auth needed). demo-scan-progress card rendered with 4 step rows. t=0: step-identify data-status=active, brand/price/market=pending. ~t=2s: identify=done, brand=active. ~t=5s: identify+brand+price=done. ~t=7s: market=active (only remaining). scan-progress-demo-replay reset identify to active and brand/market back to pending."
+    },
+    {
+      "criterion": "More page shows the System theme option + mission card + master-only shortcuts",
+      "name": "more-page-theme-mission-shortcuts",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Signed in as master, navigated to /more. more-theme-options lists exactly 5 buttons in order: System, Forest Light, Forest Dark, Obsidian, Sunroom. Clicking more-theme-system set aria-pressed=true; a hard page.reload() kept aria-pressed=true (localStorage-persisted). more-mission card visible with heading 'Good finds support great causes.'. more-shortcut-activity and more-shortcut-staff (master-only) both visible. (Note: the component's actual testid is 'more-mission', not the alternate 'mission-card' name also mentioned in the criterion text — both point at the same MissionCard instance.)"
+    },
+    {
+      "criterion": "Finds page renders cards, filters work, and legacy /inventory URL still mounts",
+      "name": "finds-filters-and-legacy-inventory-route",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Navigated to /finds: finds-search, finds-filter-all/available/sold/pat-pending chips, and finds-grid all rendered. Typing a non-matching query into finds-search replaced the grid with a 'No matches' empty state (client-side filter proven). Clicking finds-filter-sold re-rendered the grid scoped to sold items. Navigating to /inventory loaded the legacy Inventory page (inventory-search visible), confirming the lazy chunk still mounts."
+    },
+    {
+      "criterion": "Appraise save flow surfaces the SuccessMoment and does NOT auto-redirect",
+      "name": "appraise-save-success-moment-and-why-estimate",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked navigator.mediaDevices.getUserMedia with a canvas.captureStream() fake video track (legitimate headless-camera test technique, not an app/data mock) so the REAL CameraCapture -> shutter -> onCapture flow ran end-to-end. Clicked item-photo-slot, camera-shutter, camera-use to capture a real data-URL photo, then appraise-button triggered a genuine POST /api/appraise (Gemini correctly identified the synthetic image as a 'placeholder image used for system calibration', proving the live model call, not a stub). save-inventory-button triggered a real POST /api/inventory; success-moment card appeared with heading 'You found a good one!' and the three CTAs (success-moment-print/-scan-another/-view-finds) visible; URL stayed on /scan (no auto-redirect). Test-created inventory row was deleted via the API afterwards to keep Finds clean."
+    },
+    {
+      "criterion": "WhyThisEstimate accordion shows evidence from the real appraisal + honest no-sources footer",
+      "name": "appraise-save-success-moment-and-why-estimate",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same run as above: after the real appraisal result rendered, why-this-estimate-toggle had aria-expanded='false' by default; clicking it revealed why-this-estimate-content, and why-this-estimate-honesty contained both exact phrases 'This estimate is based on Gemini's analysis of your photos' and 'No external market URLs are returned by this appraisal'. No fabricated source URLs or comparables were present anywhere in the accordion."
+    }
+  ]
+}

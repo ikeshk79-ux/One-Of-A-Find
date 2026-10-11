@@ -56,12 +56,14 @@ function analyzeQuality(canvas: HTMLCanvasElement): { dark: boolean; blurry: boo
 export default function CameraCapture({
   open,
   title,
+  description,
   onClose,
   onCapture,
   testid,
 }: {
   open: boolean;
   title: string;
+  description?: string;
   onClose: () => void;
   onCapture: (dataUrl: string) => void;
   testid: string;
@@ -214,7 +216,7 @@ export default function CameraCapture({
         <DialogHeader>
           <DialogTitle className="display-title text-sm text-gold">{title}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Hold the item steady in frame, then take the shot.
+            {description ?? "Hold the item steady in frame, then take the shot."}
           </DialogDescription>
         </DialogHeader>
 

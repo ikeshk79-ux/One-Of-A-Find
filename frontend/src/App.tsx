@@ -1,17 +1,46 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import Home from "@/pages/Home";
-import Scan from "@/pages/Scan";
 import Finds from "@/pages/Finds";
 import More from "@/pages/More";
-import Inventory from "@/pages/Inventory";
-import TagPage from "@/pages/TagPage";
-import PrintTags from "@/pages/PrintTags";
-import Activity from "@/pages/Activity";
-import Staff from "@/pages/Staff";
 import SunroomDemo from "@/pages/SunroomDemo";
 import SessionLocationDemo from "@/pages/SessionLocationDemo";
 import ScanProgressDemo from "@/pages/ScanProgressDemo";
+
+// Heavy routes split off so the Home chunk stays small on mobile networks.
+// Scan contains the full Appraise capture + valuation flow and loads only when the user taps
+// into the camera studio; Inventory + PrintTags + TagPage include barcode/QR/print tooling that
+// isn't needed for the home surface; Activity and Staff are master-only.
+const Scan = lazy(() => import("@/pages/Scan"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const TagPage = lazy(() => import("@/pages/TagPage"));
+const PrintTags = lazy(() => import("@/pages/PrintTags"));
+const Activity = lazy(() => import("@/pages/Activity"));
+const Staff = lazy(() => import("@/pages/Staff"));
+
+function RouteFallback() {
+  return (
+    <div
+      className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-muted-foreground"
+      data-testid="route-fallback"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2 className="size-4 animate-spin" />
+      Loading…
+    </div>
+  );
+}
+
+function lazyGated(element: React.ReactElement): React.ReactElement {
+  return (
+    <RequireAuth>
+      <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+    </RequireAuth>
+  );
+}
 
 export default function App() {
   return (
@@ -38,14 +67,7 @@ export default function App() {
           </RequireAuth>
         }
       />
-      <Route
-        path="/scan"
-        element={
-          <RequireAuth>
-            <Scan />
-          </RequireAuth>
-        }
-      />
+      <Route path="/scan" element={lazyGated(<Scan />)} />
       <Route
         path="/finds"
         element={
@@ -64,46 +86,11 @@ export default function App() {
       />
 
       {/* Legacy routes — kept so bookmarks and deep links continue to work. */}
-      <Route
-        path="/inventory"
-        element={
-          <RequireAuth>
-            <Inventory />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/tag/:id"
-        element={
-          <RequireAuth>
-            <TagPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/print-tags"
-        element={
-          <RequireAuth>
-            <PrintTags />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/activity"
-        element={
-          <RequireAuth>
-            <Activity />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/volunteers"
-        element={
-          <RequireAuth>
-            <Staff />
-          </RequireAuth>
-        }
-      />
+      <Route path="/inventory" element={lazyGated(<Inventory />)} />
+      <Route path="/tag/:id" element={lazyGated(<TagPage />)} />
+      <Route path="/print-tags" element={lazyGated(<PrintTags />)} />
+      <Route path="/activity" element={lazyGated(<Activity />)} />
+      <Route path="/volunteers" element={lazyGated(<Staff />)} />
     </Routes>
   );
 }

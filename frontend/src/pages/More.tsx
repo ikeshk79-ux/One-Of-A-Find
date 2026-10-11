@@ -9,6 +9,7 @@ import {
   Info,
   LogOut,
   MapPin,
+  Monitor,
   Moon,
   Palette,
   Printer,
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import Avatar from "@/components/Avatar";
 import AvatarPicker from "@/components/AvatarPicker";
 import LocationSwitcher from "@/components/LocationSwitcher";
+import MissionCard from "@/components/common/MissionCard";
 import SectionHeader from "@/components/common/SectionHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +42,12 @@ import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS: readonly { id: ThemeName; label: string; description: string; Icon: typeof Sun }[] =
   [
+    {
+      id: "system",
+      label: "System",
+      description: "Follow the device's light/dark preference",
+      Icon: Monitor,
+    },
     {
       id: "forest-light",
       label: "Forest · Light",
@@ -311,6 +319,9 @@ export default function More() {
           </p>
         </div>
       </SettingsBlock>
+
+      {/* Charity mission */}
+      <MissionCard testid="more-mission" />
 
       {/* Sign out */}
       <section className="pt-2">
