@@ -28,7 +28,7 @@ def test_lookup_known_sku_returns_200_and_matches_created_item():
                 "appraisal": {
                     "title": "tscheck-lookup-item",
                     "brand": "Test",
-                    "category": "Homeware",
+                    "category": "Homewear",
                     "description": "x",
                     "condition": "Good",
                     "peak_retail_price": 100,

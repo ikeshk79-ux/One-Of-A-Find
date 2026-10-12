@@ -1,0 +1,82 @@
+{
+  "iteration": 14,
+  "mode": "retest",
+  "summary": "Backend 33/33 passed (fixed 3 pre-existing test fixtures that used invalid category spellings 'Homeware'/'Clothing', now correctly rejected by the new create_item() validation; corrected to the real category 'Homewear'). Browser: 2 new-criterion checks passed (inventory-size-filter dedup, no console key-warnings) + 1 passed (edit-category menswear subcategories) + 1 passed (menswear-subcategory size list) + 23 other previously-green checks re-confirmed passing. 17 checks failed on a stale `item-photo-slot`/`appraise-button` post-login selector that predates this iteration (the 'Home Quick Find' redesign, commit 6dfbdd2, changed post-login landing from the Appraise page to Home) — same root-cause class as the 3 checks the briefing already excludes as carryover drift; confirmed via direct login API call (200, session+CSRF cookies set) and screenshot showing the app correctly on Home, so this is stale-test drift, not an app regression. 2 further checks failed for unrelated reasons: price-tag-brand-logo-unavatar (external unavatar.io returns 404 inside the browser context while curl from the same sandbox returns 200 for the identical URL — external dependency flake, BrandLogo.tsx untouched this iteration) and quickfind-typeahead-suggestions (accumulated tscheck- fixture residue in a 'jackets/coats' category now outranks the seeded 'jacket' item in the top-6 suggestions — known residue issue flagged in iteration 13's action items, not a code regression).",
+  "passed": 29,
+  "failed": 19,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Bug fix: POST /api/inventory now rejects unknown categories",
+      "name": "pytest tests/test_tscheck_menswear_categories_and_size_migration.py::test_new_menswear_subcategories_accepted_and_mens_general_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest tests/test_tscheck_menswear_categories_and_size_migration.py -> '2 passed'. POST /api/inventory with category='Men's general' -> 422 'Unknown category'; POST with each of the 5 new menswear sub-categories + 'Men's accessories' -> 201."
+    },
+    {
+      "criterion": "No regressions elsewhere (backend 31/31 -> now 33/33, incl. 2 tests whose fixtures needed the typo 'Homeware'/'Clothing' corrected to the real category 'Homewear' now that creation validates category)",
+      "name": "pytest -q (33 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q -p no:cacheprovider -> '33 passed in 40.97s'. Fixed 3 pre-existing test files (test_tscheck_backend_contract_v2.py, test_tscheck_csrf_body_token.py, test_tscheck_giftaid_sell_allocation.py, test_tscheck_scan_sku_lookup.py, test_tscheck_activity_audit_log.py) that used category strings outside CATEGORIES ('Homeware'/'Clothing') which the new validation now correctly rejects with 422; corrected to the valid 'Homewear'."
+    },
+    {
+      "criterion": "ALL_SIZES de-duplicated, no duplicate-key console warnings in inventory size filter",
+      "name": "inventory-size-filter-accepts-new-combined-labels",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check: filter opened and applied for Women's tops, Men's shirts, Men's trousers, Men's suits, Men's shoes combined-label sizes; console_errors=[] (no 'Encountered two children with the same key' warning)."
+    },
+    {
+      "criterion": "No regressions: TagPage edit-dialog category check",
+      "name": "edit-category-menswear-subcategories-no-mens-general",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check unchanged: category dropdown opens, menswear subcategories selectable, 'Men's general' absent."
+    },
+    {
+      "criterion": "No regressions: menswear-subcategory -> size-list browser check",
+      "name": "menswear-subcategory-shows-correct-size-list",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check unchanged: shirts/trousers/suits/blazers/shoes each show the correct size axis; accessories shows no size field."
+    },
+    {
+      "criterion": "No regressions elsewhere (previously-green browser set, batch 1)",
+      "name": "login-populates-csrf-sessionstorage, manager-signin-happy-path, finds-filters-and-legacy-inventory-route, tag-page-renders-price-barcode-condition, price-tag-condition-line-plain-text, condition-only-edit-no-misleading-guide-line, manual-price-edit-suppresses-guide-line, reprice-from-condition-restores-guide-line, single-photo-warning-snapshot-behaviour, appraise-save-success-moment-and-why-estimate, scan-camera-dialog-headers, scan-progress-demo-four-steps, more-page-theme-mission-shortcuts, animation-classes-audit, home-to-scan-bottom-nav, home-quick-find-present-above-scan-card, home-find-typeahead-navigates-to-item, home-find-recents-and-keyboard, home-find-scan-button-manual-sku, quickfind-suggestion-tap-navigates-to-tag, quickfind-keyboard-navigation, quickfind-recent-items-shown-when-empty, quickfind-scan-button-manual-sku, quickfind-typeahead-preview-ingress",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "All 24 re-ran by name with no script changes and passed; no assertion failures, no new console errors beyond expected benign 401/404s from intentional negative-case probes."
+    },
+    {
+      "criterion": "No regressions elsewhere (pre-existing stale post-login selector drift, NOT caused by this iteration)",
+      "name": "login-unlocks-appraise-page, master-login-shows-activity-log, sign-out-returns-to-lock-screen, session-branch-persists-across-signin-and-nav, my-branch-toggle-scopes-inventory, volunteer-activity-forbidden, volunteer-register-new-account, inventory-loads-with-stats-and-items, inventory-sort-reorders-grid, price-tag-barcode-qr-and-gallery, giftaid-edit-numeric-only-persists, giftaid-sale-allocation-banner, condition-edit-persists-after-reload-and-inventory-grid, expanded-condition-list-all-seven-grades-selectable, appraise-another-cta-opens-appraisal-screen, scan-tag-sku-lookup, scanner-accepts-tag-url-payload",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "All 17 fail at an `expect(getByTestId('item-photo-slot'|'appraise-button')).toBeVisible()` right after SarahTest/master sign-in. Debug check confirmed: POST /api/auth/login returns 200 with session+CSRF cookies correctly set (curl and in-browser fetch both verified), and the screenshot after submit shows the app correctly rendering the Home page (search bar, 'Scan an item' card, 'Signed in' toast) — NOT a broken/blank page. 'item-photo-slot' only exists on /appraise (Appraise.tsx); these scripts assume post-login landing is the Appraise page, which predates the 'Home Quick Find' redesign (git commit 6dfbdd2, already shipped before this iteration) that moved the landing page to Home. Same root-cause class as the 3 checks the briefing already excludes as carryover drift (inventory-category-dropdown-fixed-list, inventory-category-and-availability-filters, tag-page-ctas-route-correctly)."
+    },
+    {
+      "criterion": "No regressions elsewhere (external dependency flake, unrelated to this iteration's diff)",
+      "name": "price-tag-brand-logo-unavatar",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "Levi's brand logo <img> never decodes (w:0,h:0); browser network log shows a 404 for https://unavatar.io/levi.com?fallback=false, but `curl -o /dev/null -w '%{http_code}' https://unavatar.io/levi.com?fallback=false` from the same sandbox returns 200 for the identical URL (checked twice, reproducible both ways). BrandLogo.tsx was not touched this iteration; this is third-party-service inconsistency from the browser context, not an app code defect."
+    },
+    {
+      "criterion": "No regressions elsewhere (accumulated tscheck- fixture residue affecting search ranking, flagged in iteration 13's action items)",
+      "name": "quickfind-typeahead-suggestions",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "Searching 'jacket' on /finds: top suggestion is 'tscheck-reprice 1791842838129 / test brand · sku 753206 / £34.00', not a title containing 'jacket'. Root cause: QuickFind matches on category text too, and a tscheck- fixture item filed under a 'jackets/coats' category now outranks the seeded jacket item in the top-6 by recency. Reproduced on rerun (not flaky). Not caused by this iteration's diff (ALL_SIZES/category-validation changes don't touch search ranking); pre-existing residue growth across iterations."
+    }
+  ],
+  "action_items": [
+    "Stale-selector browser checks assuming post-login landing is /appraise ('item-photo-slot'/'appraise-button') should be refreshed to assert on the current Home landing instead: login-unlocks-appraise-page, master-login-shows-activity-log, sign-out-returns-to-lock-screen, session-branch-persists-across-signin-and-nav, my-branch-toggle-scopes-inventory, volunteer-activity-forbidden, volunteer-register-new-account, inventory-loads-with-stats-and-items, inventory-sort-reorders-grid, price-tag-barcode-qr-and-gallery, giftaid-edit-numeric-only-persists, giftaid-sale-allocation-banner, condition-edit-persists-after-reload-and-inventory-grid, expanded-condition-list-all-seven-grades-selectable, appraise-another-cta-opens-appraisal-screen, scan-tag-sku-lookup, scanner-accepts-tag-url-payload (17 checks, same class as the 3 already-known carryover-drift checks).",
+    "price-tag-brand-logo-unavatar: investigate why unavatar.io returns 404 to the headless-browser request but 200 to a plain curl for the identical URL from the same sandbox (possibly a User-Agent/Referer check on unavatar's side) — re-test from the public preview URL to rule out a localhost-specific block.",
+    "quickfind-typeahead-suggestions: tscheck- fixture residue in jacket/coat categories is now large enough to outrank the seeded 'jacket' item in top-6 search suggestions; either prune old tscheck- rows or tighten the check to filter by a more specific query.",
+    "Carryover (pre-existing, excluded from this iteration's scope per briefing): inventory-category-dropdown-fixed-list, inventory-category-and-availability-filters, tag-page-ctas-route-correctly still have stale selectors from before the login-flow rename."
+  ],
+  "retest_needed": true
+}

@@ -73,7 +73,7 @@ def test_inventory_create_get_delete_lifecycle(master_client):
         "appraisal": {
             "title": f"tscheck-contract-item-{unique}",
             "brand": "TestBrand",
-            "category": "Clothing",
+            "category": "Homewear",
             "description": "A test item for backend contract verification.",
             "condition": "Good",
             "is_electrical": False,

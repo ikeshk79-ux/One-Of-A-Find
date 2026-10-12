@@ -139,6 +139,10 @@ async def lookup_by_sku(sku: str, session: dict = Depends(require_session)):
 @router.post("", response_model=InventoryItem, status_code=201)
 async def create_item(body: InventoryCreate, session: dict = Depends(require_session)):
     appraisal = body.appraisal.model_dump()
+    # Mirror the edit path: only accept a known category so a non-UI client (or an older client
+    # still sending retired labels like "Men's general") can't persist an unknown bucket.
+    if appraisal.get("category") not in CATEGORIES:
+        raise HTTPException(status_code=422, detail="Unknown category")
     # Match the edit path: never persist a negative price (e.g. a hand-typed custom price) and
     # always round to pence so it can't skew potential_value / all_time_raised totals.
     appraisal["recommended_price"] = round(max(0.0, float(appraisal.get("recommended_price") or 0)), 2)

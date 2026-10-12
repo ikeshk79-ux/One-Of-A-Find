@@ -106,7 +106,7 @@ def test_body_csrf_token_header_bypasses_403_when_cookie_present():
                 "appraisal": {
                     "title": f"tscheck-csrf-body-token-{unique}",
                     "brand": "TestBrand",
-                    "category": "Clothing",
+                    "category": "Homewear",
                     "description": "CSRF body-token regression test item.",
                     "condition": "Good",
                     "is_electrical": False,

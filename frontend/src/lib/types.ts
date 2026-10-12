@@ -95,7 +95,11 @@ export const CATEGORIES = [
   "Jewellery",
   "Media (DVD/CD)",
   "Men's accessories",
-  "Men's general",
+  "Men's blazers",
+  "Men's shirts",
+  "Men's shoes",
+  "Men's suits",
+  "Men's trousers",
   "Women's accessories",
   "Women's dresses",
   "Women's jackets/coats",
@@ -106,60 +110,120 @@ export const CATEGORIES = [
   "Women's trousers",
 ] as const;
 
-// Categories that take an alpha clothing size (XXS–XXL). "Women's shoes" uses shoe sizes; all other
-// categories (accessories, homewear, books, media, jewellery) have no size.
-export const CLOTHING_SIZE_CATEGORIES = [
-  "Women's tops",
-  "Women's knitwear",
-  "Women's skirts",
-  "Women's trousers",
-  "Women's dresses",
-  "Women's jackets/coats",
-  "Children",
+// Combined size labels: each option shows all systems on one line so volunteers tap whichever
+// system is on the garment label (UK number, alpha, EU, collar/waist/chest). The selected string
+// is stored and printed verbatim on the tag.
+export const WOMENS_SIZES = [
+  "UK 4 · XS · EU 32",
+  "UK 6 · XS · EU 34",
+  "UK 8 · S · EU 36",
+  "UK 10 · M · EU 38",
+  "UK 12 · M · EU 40",
+  "UK 14 · L · EU 42",
+  "UK 16 · XL · EU 44",
+  "UK 18 · XL · EU 46",
+  "UK 20 · XXL · EU 48",
 ] as const;
 
-// Men's general uses letter sizes XXS–XXXL only (no numeric equivalent).
-export const MENS_SIZE_CATEGORY = "Men's general";
-export const MENS_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"] as const;
-
-export const SHOE_SIZE_CATEGORY = "Women's shoes";
-
-// Alpha size with its approximate UK number (stored as-is and printed on the tag).
-export const CLOTHING_SIZES = [
-  "XXS (UK 4)",
-  "XS (UK 6)",
-  "S (UK 8)",
-  "M (UK 10)",
-  "L (UK 12)",
-  "XL (UK 14)",
-  "XXL (UK 16)",
+// Women's / unisex shoes: UK → EU mapping.
+export const WOMENS_SHOE_SIZES = [
+  "UK 4 · EU 37",
+  "UK 5 · EU 38",
+  "UK 6 · EU 39",
+  "UK 7 · EU 40",
+  "UK 8 · EU 42",
+  "UK 9 · EU 43",
+  "UK 10 · EU 44",
+  "UK 11 · EU 45",
+  "UK 12 · EU 46",
+  "UK 13 · EU 47",
 ] as const;
 
-// UK shoe size with its approximate European equivalent.
-export const SHOE_SIZES = [
-  "UK 4 (EU 37)",
-  "UK 5 (EU 38)",
-  "UK 6 (EU 39)",
-  "UK 7 (EU 40)",
-  "UK 8 (EU 42)",
-  "UK 9 (EU 43)",
-  "UK 10 (EU 44)",
-  "UK 11 (EU 45)",
-  "UK 12 (EU 46)",
-  "UK 13 (EU 47)",
+// Men's shirts — collar-led (inches) aligned to alpha + EU.
+export const MENS_SHIRT_SIZES = [
+  'XS · 14" · EU 36',
+  'S · 14.5" · EU 37',
+  'M · 15.5" · EU 39',
+  'L · 16.5" · EU 42',
+  'XL · 17.5" · EU 44',
+  'XXL · 18.5" · EU 46',
 ] as const;
+
+// Men's trousers — waist (W) led aligned to alpha + EU.
+export const MENS_TROUSER_SIZES = [
+  "W28 · S · EU 44",
+  "W30 · S · EU 46",
+  "W32 · M · EU 48",
+  "W34 · L · EU 50",
+  "W36 · L · EU 52",
+  "W38 · XL · EU 54",
+  "W40 · XXL · EU 56",
+] as const;
+
+// Men's suits & blazers — chest-led (regular fit) aligned to alpha + EU.
+export const MENS_SUIT_SIZES = [
+  "34R · XS · EU 44",
+  "36R · S · EU 46",
+  "38R · M · EU 48",
+  "40R · L · EU 50",
+  "42R · XL · EU 52",
+  "44R · XXL · EU 54",
+  "46R · XXL · EU 56",
+] as const;
+
+// Men's shoes — UK → EU (men's EU runs higher than women's for the same UK number, so kept separate).
+export const MENS_SHOE_SIZES = [
+  "UK 6 · EU 40",
+  "UK 7 · EU 41",
+  "UK 8 · EU 42",
+  "UK 9 · EU 43",
+  "UK 10 · EU 44",
+  "UK 11 · EU 45",
+  "UK 12 · EU 46",
+  "UK 13 · EU 47",
+] as const;
+
+// Union of every current size label, de-duplicated — fuels the inventory filter dropdown.
+// Women's and men's shoes share identical "UK N · EU M" labels for the overlapping UK 8-13 rows,
+// so collapsing them avoids React duplicate-key warnings in the filter <Select>.
+export const ALL_SIZES = Array.from(
+  new Set<string>([
+    ...WOMENS_SIZES,
+    ...WOMENS_SHOE_SIZES,
+    ...MENS_SHIRT_SIZES,
+    ...MENS_TROUSER_SIZES,
+    ...MENS_SUIT_SIZES,
+    ...MENS_SHOE_SIZES,
+  ]),
+);
 
 // Returns the size dropdown config for a category, or null if the category has no size.
 export function sizeOptionsFor(
   category: string,
 ): { kind: "clothing" | "shoe"; label: string; options: readonly string[] } | null {
-  if (category === SHOE_SIZE_CATEGORY)
-    return { kind: "shoe", label: "Shoe size", options: SHOE_SIZES };
-  if (category === MENS_SIZE_CATEGORY)
-    return { kind: "clothing", label: "Size", options: MENS_SIZES };
-  if ((CLOTHING_SIZE_CATEGORIES as readonly string[]).includes(category))
-    return { kind: "clothing", label: "Size", options: CLOTHING_SIZES };
-  return null;
+  switch (category) {
+    case "Women's tops":
+    case "Women's knitwear":
+    case "Women's skirts":
+    case "Women's trousers":
+    case "Women's dresses":
+    case "Women's jackets/coats":
+    case "Children":
+      return { kind: "clothing", label: "Size", options: WOMENS_SIZES };
+    case "Women's shoes":
+      return { kind: "shoe", label: "Shoe size (UK · EU)", options: WOMENS_SHOE_SIZES };
+    case "Men's shirts":
+      return { kind: "clothing", label: "Collar (alpha · inches · EU)", options: MENS_SHIRT_SIZES };
+    case "Men's trousers":
+      return { kind: "clothing", label: "Waist (W · alpha · EU)", options: MENS_TROUSER_SIZES };
+    case "Men's suits":
+    case "Men's blazers":
+      return { kind: "clothing", label: "Chest (alpha · UK · EU)", options: MENS_SUIT_SIZES };
+    case "Men's shoes":
+      return { kind: "shoe", label: "Shoe size (UK · EU)", options: MENS_SHOE_SIZES };
+    default:
+      return null;
+  }
 }
 
 // Tones the Tag-page "redraft listing" action can request (mirror of backend BLURB_TONES).

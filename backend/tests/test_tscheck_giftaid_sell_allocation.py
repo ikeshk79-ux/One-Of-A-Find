@@ -19,7 +19,7 @@ def test_sell_with_giftaid_ref_sets_and_clears_allocation():
                 "appraisal": {
                     "title": "tscheck-giftaid-sell-item",
                     "brand": "Test",
-                    "category": "Homeware",
+                    "category": "Homewear",
                     "description": "x",
                     "condition": "Good",
                     "peak_retail_price": 100,

@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiDelete, apiGet } from "@/lib/api";
 import { ApiError } from "@/lib/api";
-import { gbp, CATEGORIES, LOCATIONS, CLOTHING_SIZES, MENS_SIZES, SHOE_SIZES } from "@/lib/types";
+import { gbp, CATEGORIES, LOCATIONS, ALL_SIZES } from "@/lib/types";
 import type { InventoryItem, InventoryStats } from "@/lib/types";
 import { useSessionLocation } from "@/lib/sessionLocation";
 import { resolveScannedCode } from "@/lib/scan";
@@ -135,7 +135,7 @@ export default function Inventory() {
   const categories = CATEGORIES;
   // Size filter options: the full canonical clothing→shoe list, always available as a dropdown
   // (even before any sized items exist) so the ledger can be filtered by size at any time.
-  const sizeOptions = [...new Set<string>([...CLOTHING_SIZES, ...MENS_SIZES, ...SHOE_SIZES])];
+  const sizeOptions = ALL_SIZES;
 
   const items = all.filter((i) => {
     const matchesText = `${i.title} ${i.brand} ${i.category} ${i.sku}`

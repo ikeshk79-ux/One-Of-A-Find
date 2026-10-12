@@ -19,7 +19,11 @@ CATEGORIES = [
     "Jewellery",
     "Media (DVD/CD)",
     "Men's accessories",
-    "Men's general",
+    "Men's blazers",
+    "Men's shirts",
+    "Men's shoes",
+    "Men's suits",
+    "Men's trousers",
     "Women's accessories",
     "Women's dresses",
     "Women's jackets/coats",
@@ -69,6 +73,12 @@ Use plain numbers (no currency symbols). Never return null.
 """
 
 PROMPT += "\nAllowed categories (pick the single best fit, copy exactly): " + ", ".join(CATEGORIES) + "."
+PROMPT += (
+    "\nFor menswear pick the most specific category: Men's shirts (collared/button-up shirts), "
+    "Men's trousers (chinos, jeans, formal trousers), Men's suits (full suit sets), "
+    "Men's blazers (standalone jacket/blazer), Men's shoes (any footwear). Only use Men's accessories "
+    "for ties, belts, wallets, hats, scarves and similar — never as a catch-all."
+)
 
 FENCE = re.compile(r"```(?:json)?|```")
 

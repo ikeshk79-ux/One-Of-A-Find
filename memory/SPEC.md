@@ -59,6 +59,28 @@ The chosen condition is saved onto the inventory item. Each appraisal also retur
 `resale_blurb` — a ready-to-paste eBay/Vinted listing description drafted by Gemini in the same call,
 stored on the item.
 
+### Categories & sizing (2026-10-12)
+Appraisal **categories** split menswear into dedicated sub-categories — `Men's shirts`, `Men's trousers`,
+`Men's suits`, `Men's blazers`, `Men's shoes` (plus `Men's accessories` for ties/belts/wallets).
+The legacy catch-all `Men's general` was retired; existing items were migrated to `Men's shirts`
+via `backend/migrate_sizes.py` (idempotent, re-runnable). Women's categories unchanged.
+
+**Sizing**: one aligned dropdown per category, each row showing every system on one line so the
+volunteer taps whichever is on the garment label:
+- Women's clothing / Children: `UK 4 · XS · EU 32` … `UK 20 · XXL · EU 48`
+- Women's shoes: `UK 4 · EU 37` … `UK 13 · EU 47`
+- Men's shirts (collar-led): `XS · 14" · EU 36` … `XXL · 18.5" · EU 46`
+- Men's trousers (waist-led): `W28 · S · EU 44` … `W40 · XXL · EU 56`
+- Men's suits / blazers (chest-led, R fit): `34R · XS · EU 44` … `46R · XXL · EU 56`
+- Men's shoes (men's UK→EU runs higher than women's for the same UK number): `UK 6 · EU 40` … `UK 13 · EU 47`
+
+The lists live in `frontend/src/lib/types.ts` (`WOMENS_SIZES`, `WOMENS_SHOE_SIZES`,
+`MENS_SHIRT_SIZES`, `MENS_TROUSER_SIZES`, `MENS_SUIT_SIZES`, `MENS_SHOE_SIZES`, plus `ALL_SIZES`
+union for the inventory filter). The frontend `sizeOptionsFor(category)` returns `{kind,label,options}`,
+unchanged shape — every consumer (`Appraise`, `TagPage`, `Inventory`) picks it up without any UI
+rework. Backend `routers/appraise.py` mirrors the CATEGORIES list and the appraisal prompt hints the
+model to pick the specific menswear sub-category instead of a catch-all.
+
 ## Appraisal response parsing (grounded Gemini)
 `POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the
 model wrap its JSON in citation prose or code fences. `_parse_appraisal()` in

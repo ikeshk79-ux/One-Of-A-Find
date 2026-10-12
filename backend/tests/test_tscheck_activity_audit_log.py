@@ -15,7 +15,7 @@ ITEM_PAYLOAD = {
     "appraisal": {
         "title": "tscheck-activity-item",
         "brand": "Test",
-        "category": "Homeware",
+        "category": "Homewear",
         "description": "x",
         "condition": "Good",
         "peak_retail_price": 100,
