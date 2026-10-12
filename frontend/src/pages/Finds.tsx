@@ -74,10 +74,11 @@ export default function Finds() {
           <Link
             to="/inventory"
             data-testid="finds-full-inventory"
-            className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 sm:inline-flex"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40"
           >
             <LayoutGrid className="size-4" />
-            Full inventory view
+            <span className="hidden sm:inline">Full inventory view</span>
+            <span className="sm:hidden">Full view</span>
           </Link>
         }
         testid="finds-header"
