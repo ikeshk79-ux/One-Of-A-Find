@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Camera, CameraOff, Check, Flashlight, FlashlightOff, Loader2, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle, CameraOff, Check, Flashlight, FlashlightOff, Loader2, RefreshCw, X, ZoomIn, ZoomOut } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +59,7 @@ export default function CameraCapture({
   onClose,
   onCapture,
   testid,
+  step,
 }: {
   open: boolean;
   title: string;
@@ -67,6 +67,8 @@ export default function CameraCapture({
   onClose: () => void;
   onCapture: (dataUrl: string) => void;
   testid: string;
+  /** Optional "Step N of M" indicator shown in the dialog header for multi-shot flows. */
+  step?: { current: number; total: number; label?: string };
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -214,6 +216,15 @@ export default function CameraCapture({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="border-hairline bg-charcoal sm:max-w-xl" data-testid={`${testid}-dialog`}>
         <DialogHeader>
+          {step && (
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary"
+              data-testid={`${testid}-step`}
+            >
+              Step {step.current} of {step.total}
+              {step.label ? ` · ${step.label}` : ""}
+            </p>
+          )}
           <DialogTitle className="display-title text-sm text-gold">{title}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             {description ?? "Hold the item steady in frame, then take the shot."}
@@ -264,10 +275,15 @@ export default function CameraCapture({
                 No camera available, or access was blocked. Allow camera access in your browser and
                 try again.
               </p>
-              <Button variant="outline" size="sm" data-testid={`${testid}-retry`} onClick={() => void start()}>
+              <button
+                type="button"
+                data-testid={`${testid}-retry`}
+                onClick={() => void start()}
+                className="inline-flex items-center gap-2 rounded-full border border-hairline bg-obsidian px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-gold/60 hover:text-gold"
+              >
                 <RefreshCw className="size-4" />
                 Try again
-              </Button>
+              </button>
             </div>
           )}
           {!shot && status === "live" && (
@@ -352,39 +368,68 @@ export default function CameraCapture({
           </p>
         )}
 
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" data-testid={`${testid}-cancel`} onClick={onClose}>
-            <X className="size-4" />
-            Cancel
-          </Button>
+        {/* Control row — tuned for thumb reach on phones: a big circular shutter when the
+            feed is live, and two large side-by-side buttons when a shot has been taken. */}
+        <div className="mt-1 flex items-center justify-between gap-3">
           {shot ? (
             <>
-              <Button variant="outline" data-testid={`${testid}-retake`} onClick={() => { setShot(null); changeZoom(1); setQuality(null); }}>
-                <RefreshCw className="size-4" />
+              <button
+                type="button"
+                data-testid={`${testid}-retake`}
+                onClick={() => {
+                  setShot(null);
+                  changeZoom(1);
+                  setQuality(null);
+                }}
+                className="group flex min-h-14 flex-1 items-center justify-center gap-2 rounded-full border border-hairline bg-obsidian px-5 text-sm font-semibold text-muted-foreground transition-colors hover:border-gold/60 hover:text-gold active:scale-[0.97]"
+              >
+                <RefreshCw className="size-5" />
                 Retake
-              </Button>
-              <Button
-                className="bg-gold text-gold-ink hover:bg-gold-dim"
+              </button>
+              <button
+                type="button"
                 data-testid={`${testid}-use`}
                 onClick={() => {
                   onCapture(shot);
                   onClose();
                 }}
+                className="flex min-h-14 flex-1 items-center justify-center gap-2 rounded-full bg-gold px-5 text-sm font-bold text-gold-ink shadow-lg transition-all hover:bg-gold-dim active:scale-[0.97]"
               >
-                <Check className="size-4" />
+                <Check className="size-5" />
                 Use photo
-              </Button>
+              </button>
             </>
           ) : (
-            <Button
-              className="bg-gold text-gold-ink transition-transform duration-200 hover:bg-gold-dim active:scale-95"
-              disabled={status !== "live"}
-              data-testid={`${testid}-shutter`}
-              onClick={take}
-            >
-              <Camera className="size-4" />
-              Take photo
-            </Button>
+            <>
+              <button
+                type="button"
+                data-testid={`${testid}-cancel`}
+                onClick={onClose}
+                aria-label="Close camera"
+                className="grid size-12 shrink-0 place-items-center rounded-full border border-hairline bg-obsidian text-muted-foreground transition-colors hover:border-gold/60 hover:text-gold"
+              >
+                <X className="size-5" />
+              </button>
+              <button
+                type="button"
+                data-testid={`${testid}-shutter`}
+                aria-label="Take photo"
+                disabled={status !== "live"}
+                onClick={take}
+                className="group relative grid size-20 shrink-0 place-items-center rounded-full bg-transparent transition-transform duration-150 active:scale-90 disabled:opacity-50 disabled:active:scale-100"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-full border-4 border-gold/70 transition-colors group-hover:border-gold group-disabled:border-gold/30"
+                />
+                <span
+                  aria-hidden="true"
+                  className="size-14 rounded-full bg-gold transition-all group-hover:bg-gold-dim group-active:size-12 group-disabled:bg-gold/40"
+                />
+                <span className="sr-only">Take photo</span>
+              </button>
+              <span aria-hidden="true" className="size-12 shrink-0" />
+            </>
           )}
         </div>
       </DialogContent>

@@ -81,6 +81,15 @@ unchanged shape — every consumer (`Appraise`, `TagPage`, `Inventory`) picks it
 rework. Backend `routers/appraise.py` mirrors the CATEGORIES list and the appraisal prompt hints the
 model to pick the specific menswear sub-category instead of a catch-all.
 
+### Camera capture UX (mobile-optimised, 2026-10-12)
+`CameraCapture` controls are tuned for thumb reach: a large circular shutter button centred at the
+bottom with a cancel pill on the left when the feed is live, and two full-width Retake / Use pills
+after a shot. Header gains an optional `step` prop (`{current, total, label?}`) that renders a
+"Step N of M · Label" tracker — `Appraise` passes `{1, 2, 'Item photo'}` and `{2, 2, 'Brand label'}`
+so volunteers know which shot they're taking. The post-item "Now capture the brand label" prompt
+uses a louder primary-ring pulse (`.animate-pulse-ring` keyframe in `index.css`, respects
+`prefers-reduced-motion`).
+
 ## Appraisal response parsing (grounded Gemini)
 `POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the
 model wrap its JSON in citation prose or code fences. `_parse_appraisal()` in

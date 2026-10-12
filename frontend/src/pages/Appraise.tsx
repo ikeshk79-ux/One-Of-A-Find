@@ -336,20 +336,27 @@ export default function Appraise() {
             type="button"
             onClick={() => setCamera("label")}
             data-testid="auto-brand-prompt"
-            className="mt-3 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-left transition-all hover:border-primary/50 hover:bg-primary/10"
+            className="group mt-3 flex w-full items-center gap-3 overflow-hidden rounded-xl border-2 border-primary/50 bg-primary/10 p-4 text-left shadow-sm transition-all animate-rise hover:border-primary hover:bg-primary/15 active:scale-[0.99]"
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-              <Camera className="size-4" />
+            <span
+              aria-hidden="true"
+              className="absolute -right-6 -top-6 size-24 rounded-full bg-primary/15 blur-2xl"
+            />
+            <span className="relative grid size-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg animate-pulse-ring">
+              <Camera className="size-5" />
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-foreground">
-                Great — now capture the brand label
+            <span className="relative min-w-0 flex-1">
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+                Step 2 of 2
+              </span>
+              <span className="mt-0.5 block text-sm font-semibold text-foreground">
+                Now capture the brand label
               </span>
               <span className="block text-xs text-muted-foreground">
                 A close-up of the logo or care tag doubles the AI's accuracy.
               </span>
             </span>
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-primary">
+            <span className="relative shrink-0 text-xs font-semibold uppercase tracking-wider text-primary transition-transform group-hover:translate-x-1">
               Open →
             </span>
           </button>
@@ -357,6 +364,13 @@ export default function Appraise() {
 
         <CameraCapture
           open={camera !== null}
+          step={
+            camera === "item"
+              ? { current: 1, total: 2, label: "Item photo" }
+              : camera === "label"
+                ? { current: 2, total: 2, label: "Brand label" }
+                : undefined
+          }
           title={
             camera === "label"
               ? "Now scan the brand"
