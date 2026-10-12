@@ -158,7 +158,7 @@ async def appraise(body: AppraiseRequest, _: bool = Depends(require_session)):
                         continue
         raise ValueError("could not extract a JSON object from the model response")
 
-    def _run_ungrounded() -> "asyncio.Future":  # type: ignore[name-defined]
+    def _run_ungrounded():
         fallback = LlmChat(
             api_key=api_key,
             session_id=f"appraise-{uuid.uuid4()}",

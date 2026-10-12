@@ -205,6 +205,10 @@ export default function QuickFind({
                 role="option"
                 aria-selected={index === active}
                 onMouseEnter={() => setActive(index)}
+                // Prevent the tap from blurring the input (iOS/Safari does not focus buttons on
+                // tap, so without this the wrapper's blur handler would close the dropdown
+                // before the click reaches us and the volunteer's tap is lost).
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={() => go(item)}
                 data-testid={`${testidPrefix}-suggestion-${item.id}`}
                 className={cn(
