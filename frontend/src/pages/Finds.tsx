@@ -238,20 +238,6 @@ export default function Finds() {
               </li>
             ))}
           </ul>
-          <div className="sm:hidden">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate("/inventory")}
-              data-testid="finds-full-inventory-mobile"
-            >
-              <LayoutGrid className="size-4" />
-              Open full inventory view
-            </Button>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              Use the full view to bulk-print tags, mark items sold or filter by location.
-            </p>
-          </div>
           <Badge variant="secondary" className="hidden" data-testid="finds-badge-anchor">
             {filtered.length}
           </Badge>

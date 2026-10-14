@@ -426,7 +426,6 @@ export default function CameraCapture({
                   aria-hidden="true"
                   className="size-14 rounded-full bg-gold transition-all group-hover:bg-gold-dim group-active:size-12 group-disabled:bg-gold/40"
                 />
-                <span className="sr-only">Take photo</span>
               </button>
               <span aria-hidden="true" className="size-12 shrink-0" />
             </>

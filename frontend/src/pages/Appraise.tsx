@@ -336,7 +336,7 @@ export default function Appraise() {
             type="button"
             onClick={() => setCamera("label")}
             data-testid="auto-brand-prompt"
-            className="group mt-3 flex w-full items-center gap-3 overflow-hidden rounded-xl border-2 border-primary/50 bg-primary/10 p-4 text-left shadow-sm transition-all animate-rise hover:border-primary hover:bg-primary/15 active:scale-[0.99]"
+            className="group relative mt-3 flex w-full items-center gap-3 overflow-hidden rounded-xl border-2 border-primary/50 bg-primary/10 p-4 text-left shadow-sm transition-all animate-rise hover:border-primary hover:bg-primary/15 active:scale-[0.99]"
           >
             <span
               aria-hidden="true"
