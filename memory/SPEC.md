@@ -101,6 +101,13 @@ uses a louder primary-ring pulse (`.animate-pulse-ring` keyframe in `index.css`,
 ### Security hardening (2026-10-14)
 - **Request body cap (SEC-001)**: `server.py` middleware rejects any `/api` POST/PUT/PATCH whose
   Content-Length exceeds `MAX_API_BODY_BYTES = 20 MiB` with 413 before Starlette buffers the body.
+  When no Content-Length is declared (chunked transfer) the middleware meters `request.stream()`
+  itself, aborts with 413 past the cap, and replays the drained bytes to the route via
+  `request._body` (the cache `BaseHTTPMiddleware` already honours).
+- **CSV formula injection**: `routers/pricing.py::_csv_safe()` prefixes any `audit.csv` cell whose
+  text starts with `= + - @ \t \r` with an apostrophe, so a volunteer-authored item title cannot
+  execute as a formula when the master opens the export in Excel/Sheets.
+- **Logout** clears the JS-readable `ooaf_csrf` cookie alongside the session cookie.
   Caps unauthenticated memory exhaustion on `/auth/login`, `/auth/register`, `/auth/roster` and
   bounds the appraise two-image payload comfortably.
 - **Pydantic length caps**: `LoginRequest`, `RegisterRequest`, `RosterUnlock` now carry `max_length`

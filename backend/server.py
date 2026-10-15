@@ -63,9 +63,10 @@ app.include_router(api_router)
 
 # Request-body size cap. Public endpoints (login/register/roster) parse the entire body before
 # any validator runs, so an unauthenticated attacker could stream a multi-hundred-MB JSON blob
-# and exhaust worker memory. We refuse any /api request whose Content-Length exceeds the cap
-# with a 413 Payload Too Large before FastAPI buffers the body. The limit comfortably fits the
-# largest legitimate payload — an appraisal POST with two base64 images (~6 MB each + metadata).
+# and exhaust worker memory. We refuse any /api request whose body exceeds the cap with a 413
+# Payload Too Large: by Content-Length when it is declared, and by metering the stream when it is
+# not (chunked transfer). The limit comfortably fits the largest legitimate payload — an appraisal
+# POST with two base64 images (~6 MB each + metadata).
 MAX_API_BODY_BYTES = 20 * 1024 * 1024  # 20 MiB
 
 
@@ -80,6 +81,22 @@ async def enforce_api_body_cap(request: Request, call_next):
                 return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
             if declared > MAX_API_BODY_BYTES:
                 return JSONResponse({"detail": "Request body too large"}, status_code=413)
+        else:
+            # No declared length (chunked transfer): the header check above cannot help, so meter
+            # the stream ourselves and bail the moment it crosses the cap — otherwise an anonymous
+            # caller could stream an unbounded body into the worker's memory. The bytes we drained
+            # are replayed to the route via a one-shot receive channel.
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in request.stream():
+                total += len(chunk)
+                if total > MAX_API_BODY_BYTES:
+                    return JSONResponse({"detail": "Request body too large"}, status_code=413)
+                chunks.append(chunk)
+            body = b"".join(chunks)
+            # Starlette's BaseHTTPMiddleware replays a cached `_body` to the downstream app, so
+            # handing it the bytes we drained keeps the route's parsing untouched.
+            request._body = body  # type: ignore[attr-defined]
     return await call_next(request)
 
 

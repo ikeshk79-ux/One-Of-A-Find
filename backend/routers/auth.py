@@ -8,6 +8,7 @@ from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, 
 from lib.auth import (
     COOKIE_NAME,
     COOKIE_SECURE,
+    CSRF_COOKIE,
     SESSION_TTL,
     check_login_lockout,
     check_shop_gate,
@@ -230,4 +231,7 @@ async def logout(
 ):
     await destroy_session(token_from(ooaf_session, authorization))
     response.delete_cookie(COOKIE_NAME, path="/")
+    # The CSRF cookie is readable by JS by design; leaving it behind after sign-out serves no
+    # purpose and lingers on shared till devices.
+    response.delete_cookie(CSRF_COOKIE, path="/")
     return SessionInfo(authenticated=False)

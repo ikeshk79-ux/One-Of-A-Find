@@ -77,6 +77,18 @@ async def _rows(limit: int, skip: int) -> list[LedgerRow]:
     return out
 
 
+# Volunteer-authored text (item titles, reasons) lands in a spreadsheet the master opens locally.
+# Excel/Sheets evaluate any cell starting with = + - @ (or a leading tab/CR) as a formula, so a
+# crafted title could execute on the master's machine. Prefix those cells with an apostrophe to
+# force literal text.
+_CSV_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value: object) -> str:
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(_CSV_TRIGGERS) else text
+
+
 @router.get("/audit", response_model=list[LedgerRow])
 async def list_audit(
     limit: int = Query(default=50, ge=1, le=500),
@@ -113,17 +125,17 @@ async def export_audit_csv(_: dict = Depends(require_master)):
         writer.writerow(
             [
                 r.created_at.isoformat(),
-                r.item_sku,
-                r.item_title,
-                r.item_status,
-                r.shop_name or "",
+                _csv_safe(r.item_sku),
+                _csv_safe(r.item_title),
+                _csv_safe(r.item_status),
+                _csv_safe(r.shop_name or ""),
                 r.zone if r.zone is not None else "",
                 f"{r.base_price:.2f}",
                 f"{r.adjustment_percent:.2f}",
                 f"{r.final_price:.2f}",
-                r.rule_version,
-                r.actor,
-                r.reason,
+                _csv_safe(r.rule_version),
+                _csv_safe(r.actor),
+                _csv_safe(r.reason),
             ]
         )
     buf.seek(0)
