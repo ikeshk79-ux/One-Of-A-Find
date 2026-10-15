@@ -57,6 +57,28 @@ api_router.include_router(staff_router)
 app.include_router(api_router)
 
 
+# Request-body size cap. Public endpoints (login/register/roster) parse the entire body before
+# any validator runs, so an unauthenticated attacker could stream a multi-hundred-MB JSON blob
+# and exhaust worker memory. We refuse any /api request whose Content-Length exceeds the cap
+# with a 413 Payload Too Large before FastAPI buffers the body. The limit comfortably fits the
+# largest legitimate payload — an appraisal POST with two base64 images (~6 MB each + metadata).
+MAX_API_BODY_BYTES = 20 * 1024 * 1024  # 20 MiB
+
+
+@app.middleware("http")
+async def enforce_api_body_cap(request: Request, call_next):
+    if request.url.path.startswith("/api") and request.method in {"POST", "PUT", "PATCH"}:
+        raw_len = request.headers.get("content-length")
+        if raw_len:
+            try:
+                declared = int(raw_len)
+            except ValueError:
+                return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
+            if declared > MAX_API_BODY_BYTES:
+                return JSONResponse({"detail": "Request body too large"}, status_code=413)
+    return await call_next(request)
+
+
 # CSRF (double-submit cookie) + security headers. Added BEFORE CORS so the CORS middleware
 # stays outermost and still decorates responses (including 403s). Unsafe methods on /api must
 # echo the ooaf_csrf cookie back in the X-CSRF-Token header; auth endpoints are exempt (a user

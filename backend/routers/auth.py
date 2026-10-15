@@ -1,4 +1,5 @@
 import re
+import secrets
 import uuid
 from datetime import datetime, timezone
 
@@ -41,6 +42,11 @@ from models.appraisal import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Precomputed malformed hash: verify_pin() still runs the full PBKDF2 against it before returning
+# False, so lookups for unknown usernames take the same ~100ms as a real login. Prevents an
+# unauthenticated timing oracle for account existence.
+_TIMING_DUMMY_HASH = "00" * 16 + "$" + "ff" * 32
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9 _.\-]{2,30}$")
 
 
@@ -63,7 +69,7 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     configured = shop_password()
     if not configured:
         raise HTTPException(status_code=503, detail="Registration is currently unavailable")
-    if body.shop_password.strip() != configured:
+    if not secrets.compare_digest(body.shop_password.strip(), configured):
         await record_shop_gate_failure(ip)
         raise HTTPException(status_code=401, detail="Incorrect shop password")
     await clear_shop_gate(ip)
@@ -112,7 +118,11 @@ async def login(body: LoginRequest, response: Response, token: bool = False):
     username = body.username.strip()
     await check_login_lockout(username)
     user = await db.users.find_one({"username": username})
-    if not user or not verify_pin(body.pin.strip(), user.get("pin_hash", "")):
+    # Timing hygiene: when the username is unknown, run a dummy PBKDF2 against the submitted PIN
+    # so the response latency doesn't leak account-existence to an unauthenticated attacker.
+    stored_hash = user.get("pin_hash", "") if user else _TIMING_DUMMY_HASH
+    pin_ok = verify_pin(body.pin.strip(), stored_hash)
+    if not user or not pin_ok:
         await record_login_failure(username)
         raise HTTPException(status_code=401, detail="Incorrect username or PIN")
     await clear_login_failures(username)
@@ -191,7 +201,7 @@ async def roster(body: RosterUnlock, request: Request):
     ip = client_ip(request)
     await check_shop_gate(ip)
     configured = shop_password()
-    if not configured or body.shop_password.strip() != configured:
+    if not configured or not secrets.compare_digest(body.shop_password.strip(), configured):
         await record_shop_gate_failure(ip)
         raise HTTPException(status_code=401, detail="Incorrect shop password")
     await clear_shop_gate(ip)

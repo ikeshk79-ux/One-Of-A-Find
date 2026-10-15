@@ -144,8 +144,19 @@ async def create_item(body: InventoryCreate, session: dict = Depends(require_ses
     if appraisal.get("category") not in CATEGORIES:
         raise HTTPException(status_code=422, detail="Unknown category")
     # Match the edit path: never persist a negative price (e.g. a hand-typed custom price) and
-    # always round to pence so it can't skew potential_value / all_time_raised totals.
+    # always round to pence so it can't skew potential_value / all_time_raised totals. Also
+    # clamp the peak/market numbers the client sends — the AI returns 2-3 figure GBP values, so
+    # £100k is a safe cosmetic ceiling that catches a non-UI client from skewing dashboards.
+    _PRICE_CEILING = 100_000.0
     appraisal["recommended_price"] = round(max(0.0, float(appraisal.get("recommended_price") or 0)), 2)
+    appraisal["peak_retail_price"] = round(
+        max(0.0, min(_PRICE_CEILING, float(appraisal.get("peak_retail_price") or 0))), 2
+    )
+    appraisal["market_average_price"] = round(
+        max(0.0, min(_PRICE_CEILING, float(appraisal.get("market_average_price") or 0))), 2
+    )
+    if appraisal.get("price_source") not in {"charity", "peak", "custom"}:
+        appraisal["price_source"] = "charity"
     # Gift Aid numbers are digits only — mirror the edit path so a non-UI client can't store junk.
     giftaid = body.giftaid_ref
     if giftaid is not None:

@@ -90,6 +90,23 @@ so volunteers know which shot they're taking. The post-item "Now capture the bra
 uses a louder primary-ring pulse (`.animate-pulse-ring` keyframe in `index.css`, respects
 `prefers-reduced-motion`).
 
+### Security hardening (2026-10-14)
+- **Request body cap (SEC-001)**: `server.py` middleware rejects any `/api` POST/PUT/PATCH whose
+  Content-Length exceeds `MAX_API_BODY_BYTES = 20 MiB` with 413 before Starlette buffers the body.
+  Caps unauthenticated memory exhaustion on `/auth/login`, `/auth/register`, `/auth/roster` and
+  bounds the appraise two-image payload comfortably.
+- **Pydantic length caps**: `LoginRequest`, `RegisterRequest`, `RosterUnlock` now carry `max_length`
+  on every string field (usernames 40, PINs 64, shop_password 200, avatar bounded by
+  `MAX_AVATAR_CHARS`); oversized fields return 422 pre-logic.
+- **Constant-time shop password**: `routers/auth.py` register and roster use
+  `secrets.compare_digest` instead of `!=`.
+- **Login timing-oracle narrowing**: unknown usernames still run a PBKDF2 pass against a
+  precomputed `_TIMING_DUMMY_HASH` so account-existence can't be probed by latency; the detail
+  string "Incorrect username or PIN" is identical for both branches.
+- **Inventory create price ceiling**: `peak_retail_price` and `market_average_price` are clamped
+  into `[0, 100_000]` GBP and `price_source` is coerced into the allow-list before persistence,
+  so a non-UI client can't skew dashboards. (`recommended_price` was already clamped.)
+
 ## Appraisal response parsing (grounded Gemini)
 `POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the
 model wrap its JSON in citation prose or code fences. `_parse_appraisal()` in

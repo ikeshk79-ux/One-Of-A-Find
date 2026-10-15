@@ -1,0 +1,73 @@
+{
+  "iteration": 15,
+  "mode": "retest",
+  "summary": "New security-hardening matrix (7 criteria: body-size 413 cap, Pydantic length caps, constant-time shop password, login timing-oracle narrowing, price ceiling clamp, core auth+CSRF regression, Finds duplicate-button fix, camera shutter/step indicator). Added 6 new backend pytest files (19 new tests, all passing) and 2 new browser checks (both passing, one also re-verified against the public preview URL). Full backend suite: 50/52 passing; the 2 pre-existing failures are unrelated test-environment fixtures (missing /tmp/item.jpg image file for the live-AI appraise tests) that predate this iteration's scope and are not part of the acceptance matrix.",
+  "passed": 8,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "SEC-001 fix: /api endpoints reject oversized request bodies with 413 before parsing",
+      "name": "pytest tests/test_tscheck_body_size_cap.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "7 passed. POST /auth/register, /auth/login, /auth/roster each with a >20MiB body -> 413; POST /inventory and PATCH /inventory/{id} (master session) with >20MiB body -> 413; normal-sized login (200, authenticated:true) and register with wrong shop password (401) both still work under the cap."
+    },
+    {
+      "criterion": "Public auth model length caps: oversized string fields are rejected pre-logic with 422",
+      "name": "pytest tests/test_tscheck_model_length_caps.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "4 passed. POST /auth/login username=200 chars -> 422; POST /auth/register pin=100 chars -> 422; POST /auth/roster shop_password=500 chars -> 422; legitimate master login (username='master', real pin) -> 200 authenticated:true."
+    },
+    {
+      "criterion": "Shop password now compared constant-time; still rejects wrong passwords with 401",
+      "name": "pytest tests/test_tscheck_shop_password_gate.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "3 passed. POST /auth/register shop_password='wrongvalue' -> 401 'Incorrect shop password'; POST /auth/roster same -> 401 same detail; POST /auth/register with correct 'Oneofafind' -> gate passes (not the 401 incorrect-password shape; got 201/409 depending on username availability)."
+    },
+    {
+      "criterion": "Login timing-oracle narrowed: unknown vs known username both run a PBKDF2 pass before returning 401",
+      "name": "pytest tests/test_tscheck_login_timing_oracle.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "3 passed. username='master'+wrong pin -> 401 'Incorrect username or PIN'; username='definitelynotauser'+any pin -> 401 identical detail string; both branches produce byte-identical error shape (per spec_deviations, absolute latency not asserted on this shared pod)."
+    },
+    {
+      "criterion": "Inventory create still clamps peak_retail_price/market_average_price to a sane ceiling",
+      "name": "pytest tests/test_tscheck_price_ceiling_clamp.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "1 passed. POST /inventory (master) with peak_retail_price=market_average_price=99999999 -> 201, stored item peak_retail_price<=100000 and market_average_price<=100000, recommended_price>=0; GET /inventory/stats -> 200 with finite potential_value; test item deleted (204) in finally block."
+    },
+    {
+      "criterion": "Core auth + CSRF regression: unchanged flows still work after the middleware addition",
+      "name": "pytest tests/test_tscheck_core_auth_csrf_regression.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "1 passed. master login -> 200; GET /auth/me -> authenticated:true with non-empty csrf field; POST /appraise without X-CSRF-Token -> 403; POST /appraise with valid X-CSRF-Token -> status<400 (live AI call); POST /auth/logout -> 200/204; GET /auth/me afterwards -> authenticated:false."
+    },
+    {
+      "criterion": "Browser smoke: Finds page no longer renders duplicate 'Full inventory view' button at bottom on mobile",
+      "name": "finds-no-duplicate-full-inventory-button-mobile",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "390x844 viewport, master login -> /finds: exactly 1 element with data-testid='finds-full-inventory', 0 with 'finds-full-inventory-mobile'; tap routes to /inventory (URL matched /\\/inventory/); no console/page errors, no responses >=400. Re-ran against public preview URL https://thrift-vision.preview.emergentagent.com with the same result."
+    },
+    {
+      "criterion": "Browser smoke: camera dialog shows the new shutter and step indicator on mobile",
+      "name": "camera-dialog-shutter-and-step-indicator-mobile",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "390x844 viewport, master login -> /scan, tap scan-hero-cta then item-photo-slot opens camera-dialog; camera-step visible containing 'Step 1 of 2'; camera-shutter and camera-cancel both visible; camera-cancel dismisses the dialog cleanly (camera-dialog hidden)."
+    }
+  ],
+  "action_items": [
+    "Pre-existing, out-of-scope for this iteration's matrix: tests/test_tscheck_appraise_robustness_and_gating.py::test_appraise_returns_200_three_times_in_a_row and tests/test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal both fail because they expect a fixture image at /tmp/item.jpg that doesn't exist in this environment (not checked into the repo, likely created ad-hoc in a prior session and lost on restart). Unrelated to this iteration's SEC-001/length-cap/CSRF/UI diff -- consider committing a small fixture JPG under backend/tests/fixtures/ so these self-heal across environments.",
+    "Carryover from iteration 14 (unchanged, not retested this pass since outside the new matrix): 17 checks with stale /appraise post-login landing assumptions, price-tag-brand-logo-unavatar external-dependency flake, and quickfind-typeahead-suggestions fixture-residue ranking issue."
+  ],
+  "retest_needed": false
+}

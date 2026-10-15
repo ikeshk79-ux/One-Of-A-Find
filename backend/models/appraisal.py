@@ -179,11 +179,14 @@ def _validate_avatar(avatar: str | None) -> None:
 
 
 class RegisterRequest(BaseModel):
-    shop_password: str
-    username: str
-    pin: str
-    color: str | None = None
-    avatar: str | None = None
+    # Length caps keep the public-facing payload compact; the shop password and PIN are compared
+    # exact-match, usernames enforce a stricter regex in the router, and avatar size is already
+    # bounded by _validate_avatar.
+    shop_password: str = Field(min_length=1, max_length=200)
+    username: str = Field(min_length=1, max_length=40)
+    pin: str = Field(min_length=1, max_length=64)
+    color: str | None = Field(default=None, max_length=20)
+    avatar: str | None = Field(default=None, max_length=MAX_AVATAR_CHARS + 32)
 
     @model_validator(mode="after")
     def _validate_profile(self):
@@ -241,8 +244,8 @@ class StaffCreate(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str
-    pin: str
+    username: str = Field(min_length=1, max_length=40)
+    pin: str = Field(min_length=1, max_length=64)
 
 
 class SessionInfo(BaseModel):
@@ -269,7 +272,7 @@ class Roster(BaseModel):
 
 class RosterUnlock(BaseModel):
     # Shared shop password that gates the till roster so staff names/photos aren't public.
-    shop_password: str
+    shop_password: str = Field(min_length=1, max_length=200)
 
 
 class ActivityDeleteRequest(BaseModel):
