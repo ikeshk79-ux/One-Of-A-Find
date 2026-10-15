@@ -1,4 +1,5 @@
 import secrets
+import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from lib.auth import require_session
 from lib.activity import log_activity
 from lib.db import db
+from lib.pricing import apply_adjustment
 from models.appraisal import (
     BlurbRequest,
     InventoryCreate,
@@ -15,24 +17,17 @@ from models.appraisal import (
     ItemUpdate,
     SellRequest,
 )
+from models.shop import PricingLedgerEntry
 from routers.appraise import CATEGORIES, CONDITIONS, draft_blurb
 
-# Shop branches, alphabetical — mirror of frontend LOCATIONS in src/lib/types.ts.
-LOCATIONS = [
-    "Askew Road",
-    "Brompton Road",
-    "Chiswick",
-    "Ealing",
-    "Finchley",
-    "Fulham Road",
-    "Kentish Town",
-    "King's Road",
-    "Olympia",
-    "South Kensington",
-    "Tooting",
-    "Victoria",
-    "West Hampstead",
-]
+
+async def _active_shop_names() -> set[str]:
+    """Shop names currently valid for a volunteer to pick — DB-backed replacement for the
+    old hard-coded LOCATIONS tuple. Disabled shops are excluded so a new item can't be filed
+    to a retired branch, but existing items keep their stored name on display."""
+    docs = await db.shops.find({"disabled": {"$ne": True}}, {"name": 1}).to_list(500)
+    return {doc["name"] for doc in docs}
+
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -162,8 +157,17 @@ async def create_item(body: InventoryCreate, session: dict = Depends(require_ses
     if giftaid is not None:
         giftaid = "".join(ch for ch in giftaid if ch.isdigit())[:40] or None
     # Mirror the edit path: only accept a known branch so a non-UI client can't store a junk location.
-    if body.location is not None and body.location not in LOCATIONS:
+    active_shops = await _active_shop_names()
+    if body.location is not None and body.location not in active_shops:
         raise HTTPException(status_code=422, detail="Unknown location")
+
+    # Apply the TfL-zone adjustment on the backend before persisting so the stored
+    # recommended_price always reflects the current pricing rules — the frontend's preview
+    # is advisory only.
+    base_price = appraisal["recommended_price"]
+    adjustment = await apply_adjustment(base_price, shop_name=body.location)
+    appraisal["recommended_price"] = adjustment["final_price"]
+
     item = InventoryItem(
         sku=await _unique_sku(),
         item_image=body.item_image,
@@ -175,6 +179,20 @@ async def create_item(body: InventoryCreate, session: dict = Depends(require_ses
         **appraisal,
     )
     await db.inventory.insert_one(item.model_dump())
+    # Audit row — one per saved valuation per spec #7.
+    ledger = PricingLedgerEntry(
+        item_id=item.id,
+        shop_id=adjustment["shop_id"],
+        shop_name=adjustment["shop_name"],
+        zone=adjustment["zone"],
+        base_price=adjustment["base_price"],
+        adjustment_percent=adjustment["adjustment_percent"],
+        final_price=adjustment["final_price"],
+        rule_version=adjustment["rule_version"],
+        actor=session.get("username", ""),
+        reason="create",
+    )
+    await db.pricing_ledger.insert_one(ledger.model_dump())
     await log_activity(session.get("username"), "created", item=item.model_dump())
     return item
 
@@ -196,7 +214,7 @@ async def update_item(item_id: str, body: ItemUpdate, session: dict = Depends(re
             raise HTTPException(status_code=422, detail="Unknown category")
         update["category"] = body.category
     if body.location is not None:
-        if body.location not in LOCATIONS:
+        if body.location not in await _active_shop_names():
             raise HTTPException(status_code=422, detail="Unknown location")
         update["location"] = body.location
     if body.title is not None:
@@ -231,6 +249,36 @@ async def update_item(item_id: str, body: ItemUpdate, session: dict = Depends(re
     doc = await db.inventory.find_one({"id": item_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    # If the shop/location is being changed and the volunteer isn't manually overriding the
+    # price in the same PATCH, re-run the zone adjustment from the item's original base price
+    # (pulled from its last ledger entry) so we don't double-adjust.
+    location_changed = "location" in update and update["location"] != doc.get("location")
+    will_be_charity = (update.get("price_source") or doc.get("price_source", "charity")) == "charity"
+    if location_changed and will_be_charity and body.recommended_price is None:
+        last_ledger = await db.pricing_ledger.find_one(
+            {"item_id": item_id}, sort=[("created_at", -1)]
+        )
+        base_price = (
+            float(last_ledger["base_price"]) if last_ledger else float(doc.get("recommended_price", 0))
+        )
+        adjustment = await apply_adjustment(base_price, shop_name=update["location"])
+        update["recommended_price"] = adjustment["final_price"]
+        # Audit the re-price.
+        await db.pricing_ledger.insert_one(
+            PricingLedgerEntry(
+                item_id=item_id,
+                shop_id=adjustment["shop_id"],
+                shop_name=adjustment["shop_name"],
+                zone=adjustment["zone"],
+                base_price=adjustment["base_price"],
+                adjustment_percent=adjustment["adjustment_percent"],
+                final_price=adjustment["final_price"],
+                rule_version=adjustment["rule_version"],
+                actor=session.get("username", ""),
+                reason="update:location",
+            ).model_dump()
+        )
     # Capture before/after for the audit log (master-only view).
     changes = {
         field: {"from": doc.get(field), "to": value}

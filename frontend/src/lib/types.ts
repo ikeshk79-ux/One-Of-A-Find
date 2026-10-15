@@ -272,14 +272,16 @@ export function adjustedCharityPrice(base: number, condition: string): number {
   return Math.round(base * m * 2) / 2;
 }
 
-// Shop branch locations, alphabetical. Used on the appraisal card and the inventory filter.
+// Shop branch locations, alphabetical. Legacy fallback for the dropdowns on first render —
+// the live list is read from /api/shops via `useShops()`, which includes zone + review flags.
 export const LOCATIONS = [
   "Askew Road",
   "Brompton Road",
-  "Chiswick",
+  "Chiswick High Road",
   "Ealing",
-  "Finchley",
+  "Finchley Road",
   "Fulham Road",
+  "Hampstead",
   "Kentish Town",
   "King's Road",
   "Olympia",
@@ -288,6 +290,40 @@ export const LOCATIONS = [
   "Victoria",
   "West Hampstead",
 ] as const;
+
+// Mirror of backend models/shop.py — kept hand-authored per the typed-fetch boundary.
+export interface Shop {
+  id: string;
+  name: string;
+  address: string;
+  postcode: string;
+  phone: string;
+  zone: number | null;
+  nearest_station: string;
+  outside_zones: boolean;
+  needs_zone_review: boolean;
+  disabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PricingRules {
+  id: string;
+  version: number;
+  adjustments: Record<string, number>; // keys: "1".."6" and "outside"
+  updated_at: string;
+  updated_by: string;
+}
+
+export interface PriceAdjustmentPreview {
+  base_price: number;
+  adjusted_price: number;
+  adjustment_percent: number;
+  zone: number | string | null;
+  rule_version: number;
+  shop_id: string | null;
+  shop_name: string | null;
+}
 
 // Roster tile colours — pastels that read well on the obsidian theme. Mirror of backend AVATAR_COLORS.
 export const AVATAR_COLORS = [

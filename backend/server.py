@@ -45,12 +45,14 @@ from routers.activity import router as activity_router
 from routers.appraise import router as appraise_router
 from routers.auth import router as auth_router
 from routers.inventory import router as inventory_router
+from routers.shops import router as shops_router
 from routers.staff import router as staff_router
 
 api_router.include_router(auth_router)
 api_router.include_router(appraise_router)
 api_router.include_router(inventory_router)
 api_router.include_router(activity_router)
+api_router.include_router(shops_router)
 api_router.include_router(staff_router)
 
 # Include the router in the main app

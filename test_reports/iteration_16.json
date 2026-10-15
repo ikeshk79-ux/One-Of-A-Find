@@ -1,0 +1,81 @@
+{
+  "iteration": 16,
+  "mode": "retest",
+  "summary": "New Octavia Foundation shops/pricing matrix (8 criteria: 14-shop seed data, versioned pricing-rules with merge semantics, shop CRUD master-only, preview-adjustment math, inventory create ledger write, inventory PATCH re-pricing with custom-price override, SEC-001 body-size/length caps on /api/shops, and a mobile admin-UI browser smoke). Added 7 new backend pytest files (23 tests) and 2 new browser checks. CRITICAL BUG FOUND: master POST /api/shops always 500s (TypeError: Shop() got multiple values for keyword argument 'name' in routers/shops.py:55) - shop creation is completely broken.",
+  "passed": 9,
+  "failed": 1,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Shops collection seeded with 14 Octavia Foundation branches and verified address data",
+      "name": "pytest tests/test_tscheck_shops_seeded_data.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "2 passed. GET /api/shops (master) -> 200, 14 rows; Askew Road W12 9BJ zone 2 'Shepherd's Bush Market'; Brompton Road SW3 2EJ zone 1; Tooting SW17 0RG zone 3; Chiswick High Road W4 1PA zone 2 needs_zone_review=true; Fulham Road SW10 9PZ zone 2 needs_zone_review=true; West Hampstead zone 2 (empty address OK); King's Road SW3 5EP zone 1; no 'Chiswick' old name; no other shop missing postcode. Volunteer (SarahTest) GET /api/shops -> 200, >=14 rows (skip-safe if login rate-limited)."
+    },
+    {
+      "criterion": "Pricing-rules seeded at version 1 with spec defaults (Z1 0 / Z2 -5 / Z3 -10 / Z4 -15 / Z5 -20 / Z6 -25 / outside 0)",
+      "name": "pytest tests/test_tscheck_pricing_rules_version.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "3 passed. GET /shops/pricing-rules -> 200 with all 7 adjustment keys present (Z1=0.0 confirmed); unauthenticated PUT -> 401/403; master PUT {adjustments:{'3':-12}} -> version+1, Z1 unchanged at 0.0, Z3 merged to -12.0, subsequent GET reflects it; rollback PUT {'3':-10} -> version+2, Z3 restored to -10.0 (environment left at spec defaults)."
+    },
+    {
+      "criterion": "Shop CRUD is master-only and preserves data integrity",
+      "name": "pytest tests/test_tscheck_shop_crud_master_only.py",
+      "lane": "backend",
+      "status": "failed",
+      "evidence": "Non-master POST/PATCH/DELETE on /api/shops/* correctly return 401 (passed). Master POST /api/shops with a unique name -> 500 Internal Server Error (expected 201). Server log: 'File \"/app/backend/routers/shops.py\", line 55, in create_shop: shop = Shop(**body.model_dump(), name=body.name.strip()) / TypeError: models.shop.Shop() got multiple values for keyword argument 'name'. Confirmed independently via raw curl (POST /api/shops as master -> 500 every time). Shop creation is completely broken; the rest of the criterion (duplicate-name 409, PATCH zone-clearing semantics, soft-disable) could not be exercised because no fixture shop can be created."
+    },
+    {
+      "criterion": "Zone-adjustment preview endpoint returns correct math",
+      "name": "pytest tests/test_tscheck_preview_adjustment_math.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "2 passed. GET /shops/preview-adjustment?base_price=50&shop_name=Tooting -> adjusted_price=45, adjustment_percent=-10, zone=3; shop_name=Brompton%20Road -> 50 (Z1 0%); shop_name=Ealing -> 45 (Z3 -10%); base_price=37&shop_name=Tooting -> 33 (rounded to £1); no shop_name -> adjusted_price=base_price, zone=null, adjustment_percent=0; unauthenticated call -> 401."
+    },
+    {
+      "criterion": "Inventory create applies the adjustment and writes a pricing_ledger row",
+      "name": "pytest tests/test_tscheck_inventory_create_zone_adjustment.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "1 passed. POST /inventory (master) appraisal.recommended_price=80, location='Tooting' -> 201, stored recommended_price=72; db.pricing_ledger row found for item_id with reason='create', base_price=80, adjustment_percent=-10, final_price=72, zone=3, rule_version>=1; POST without location -> recommended_price stays 80. Both test items deleted in finally block."
+    },
+    {
+      "criterion": "Inventory PATCH re-prices when location changes (but not when price_source is custom)",
+      "name": "pytest tests/test_tscheck_inventory_patch_location_repricing.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "2 passed. Item created at Tooting (100 -> 90, Z3); PATCH {location:'Brompton Road'} -> recommended_price=100, ledger row reason='update:location' base=100 pct=0 final=100 zone=1. Separate item created at Tooting (90); PATCH {price_source:'custom', recommended_price:77} -> 77; PATCH {location:'Brompton Road'} -> stays 77, no 'update:location' ledger row added. Both items deleted."
+    },
+    {
+      "criterion": "Backend body-size cap (SEC-001) and length caps still fire on /api/shops",
+      "name": "pytest tests/test_tscheck_shops_body_size_and_length_caps.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "3 passed. POST /api/shops (master) with a genuinely oversized (>20MiB) body -> 413 before parsing; POST /api/shops with a 200-char name -> 422 (max_length=80); POST /api/shops with zone=99 -> 422."
+    },
+    {
+      "criterion": "Browser smoke: master can open /admin, lists shops with correct review flags, edits a zone and the preview updates",
+      "name": "admin-master-shops-pricing",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "390x844 on public preview URL: Manager sign-in via unlock-manager-signin -> master/pin -> home. Navigated to /admin: 'Shops & pricing' title visible, 14 li[data-testid^=admin-shop-] rows rendered, 'Review' pill visible (Chiswick High Road/Fulham Road). Tapped pencil icon on first shop -> admin-shop-dialog visible with admin-shop-name/admin-shop-zone/admin-shop-save all visible. Tapped Cancel -> dialog hidden, zero network responses >=400 recorded after cancel. Re-ran persisted check: passed again (stable)."
+    },
+    {
+      "criterion": "Browser smoke: non-master /admin access blocked + Scan page shop dropdown shows a DB-only shop name",
+      "name": "admin-nonmaster-redirects-and-scan-dropdown",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "390x844 on public preview URL: SarahTest signed in, visited /admin -> admin-shops section not rendered (0 count), confirming the redirect/unauthorised gate. Signed out via More page (more-signout), then master signed in, captured a mock camera photo on /scan, ran Appraise, opened the appraisal-location-select dropdown and confirmed appraisal-location-Tooting is present -- Tooting is only in the DB-backed shops collection (no static fallback tuple entry), confirming useShopNames is live-wired. Re-ran persisted check: passed again (stable)."
+    }
+  ],
+  "action_items": [
+    "CRITICAL BUG (confirmed via pytest + raw curl + server log): POST /api/shops always returns 500 for the master role because routers/shops.py:55 does `Shop(**body.model_dump(), name=body.name.strip())` where body.model_dump() already contains a 'name' key, producing `TypeError: models.shop.Shop() got multiple values for keyword argument 'name'`. This blocks the entire 'Add shop' admin-UI flow and the master-POST-creates-a-shop acceptance criterion. Fix: drop the redundant name= kwarg, e.g. `Shop(**{**body.model_dump(), \"name\": body.name.strip()})` or exclude name from the dump before splatting.",
+    "Because shop creation 500s, the duplicate-name (409), PATCH zone-clearing (outside_zones/needs_zone_review interplay), and soft-disable/include_disabled parts of the shop-CRUD criterion could not be exercised end-to-end on a freshly created shop in this iteration; only the non-master-rejection half of that criterion is independently confirmed. Re-run tests/test_tscheck_shop_crud_master_only.py after the create-shop bug is fixed to get full coverage (the test file already contains those assertions, gated behind the successful POST).",
+    "Pre-existing, out of scope for this matrix (carried over from iteration 15): tests/test_tscheck_appraise_robustness_and_gating.py::test_appraise_returns_200_three_times_in_a_row and tests/test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal fail because the fixture image at /tmp/item.jpg doesn't exist in this environment."
+  ],
+  "retest_needed": true
+}

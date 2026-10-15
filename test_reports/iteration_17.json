@@ -1,0 +1,21 @@
+{
+  "iteration": 17,
+  "mode": "retest",
+  "summary": "Targeted re-verification of the single iteration-16 regression: POST /api/shops 500 caused by passing 'name' kwarg twice in routers/shops.py::create_shop. Fix confirmed: tests/test_tscheck_shop_crud_master_only.py now passes end-to-end (2/2). Cleaned up 1 leftover 'tscheck-shop-14c94064' residue row from the previous iteration's partial run; the 14 Octavia-seeded shops remain intact.",
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "FIX VERIFICATION: Shop CRUD is master-only and preserves data integrity (the only failed check from iteration 16)",
+      "name": "pytest tests/test_tscheck_shop_crud_master_only.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "2 passed in 0.89s. Non-master POST/PATCH/DELETE on /api/shops -> 401/403 (confirmed). Master POST /api/shops with unique name -> 201 (fix verified: no more 500/TypeError). Master POST with same name -> 409. Master PATCH edits editable fields; outside_zones=true clears zone to null; setting a zone implicitly clears needs_zone_review unless the request also sends needs_zone_review=true. Master DELETE soft-disables (disabled=true, record still present in Mongo). GET /api/shops hides disabled rows by default; GET /api/shops?include_disabled=1 includes them. Post-run DB check: total shops=15 after test run (1 residual tscheck- shop from iteration 16's partial run), cleaned up via direct delete -> 14 shops remaining, matching the Octavia seed count exactly."
+    }
+  ],
+  "action_items": [],
+  "retest_needed": false
+}

@@ -107,6 +107,51 @@ uses a louder primary-ring pulse (`.animate-pulse-ring` keyframe in `index.css`,
   into `[0, 100_000]` GBP and `price_source` is coerced into the allow-list before persistence,
   so a non-UI client can't skew dashboards. (`recommended_price` was already clamped.)
 
+### Shops, TfL zones & price adjustments (2026-10-14)
+Replaces the hard-coded `LOCATIONS` tuple with a Mongo-backed `shops` collection seeded from
+the Octavia Foundation website (13 verified branches at
+https://www.octaviafoundation.org.uk/charity_shops/find_a_shop_near_you plus the legacy
+"West Hampstead" entry kept by user request). Each shop carries `name`, `address`, `postcode`,
+`phone`, `zone` (1-6 or `null`), `nearest_station`, `outside_zones`, `needs_zone_review`,
+`disabled`. Seeding is idempotent via `backend/seed_shops.py` and only overwrites the four
+verified columns (`address`, `postcode`, `phone`, `nearest_station`) on re-runs so admin
+corrections survive. Boundary stations (Chiswick High Road → Turnham Green Z2/Z3; Fulham Road
+→ Earl's Court Z1/Z2) ship with `needs_zone_review=true` so the master is prompted.
+
+Pricing rules live in `pricing_rules` as a versioned document: each master edit bumps the
+version. Defaults: Z1 0%, Z2 -5%, Z3 -10%, Z4 -15%, Z5 -20%, Z6 -25%, outside/unmapped 0%.
+
+`lib/pricing.py::apply_adjustment()` is the single backend-anchored price calculator — it
+looks up the shop (by `shop_id` or canonical `shop_name`), reads the latest rules, applies
+the percentage, and rounds to the nearest £1 when the adjustment is non-zero (otherwise it
+keeps the base's existing 50p rounding per spec). It returns both the final price and the
+metadata needed for the audit row.
+
+**Inventory hooks**:
+- `POST /inventory` adjusts the recommended price via the shop's zone before persisting and
+  writes a `pricing_ledger` row (reason="create") with base/adjustment/final/zone/rule_version.
+- `PATCH /inventory/{id}` recomputes the price when the location changes **and** the item's
+  price_source after the patch is "charity" **and** the volunteer isn't manually overriding
+  the price in the same call. Uses the most recent ledger row's `base_price` as the starting
+  point so the adjustment is never double-applied. Writes a `pricing_ledger` row
+  (reason="update:location").
+- The LOCATIONS allow-list is now derived from `db.shops` (`_active_shop_names()`); disabled
+  shops are excluded so new items can't be filed to a retired branch.
+
+**Admin UI**: `/admin` (master-only route). Lists all shops with inline edit (dialog edits
+name/address/postcode/station/zone/review-flag), add-new, soft-disable + re-enable; shows a
+banner summarising how many shops still need zone review. A separate "Pricing rules" section
+on the same page edits the seven percentage cells and bumps the version on save. The route is
+exposed from `More` via the "Shops & pricing" tile for the master only.
+
+**Appraise form**: a one-line `ZoneAdjustmentHint` under the shop-location dropdown previews
+the zone-adjusted price via `GET /shops/preview-adjustment`. Advisory only — the backend
+recomputes canonically on save.
+
+**Frontend hooks**: `src/hooks/useShops.ts` exposes `useShops`, `useShopNames` (string[] for
+dropdowns, falls back to the static LOCATIONS tuple while loading), and `usePricingRules`.
+Mirror interfaces (`Shop`, `PricingRules`, `PriceAdjustmentPreview`) live in `src/lib/types.ts`.
+
 ## Appraisal response parsing (grounded Gemini)
 `POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the
 model wrap its JSON in citation prose or code fences. `_parse_appraisal()` in

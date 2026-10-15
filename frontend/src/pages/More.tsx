@@ -15,6 +15,7 @@ import {
   Printer,
   ShieldCheck,
   Sparkles,
+  Store,
   Sun,
   User as UserIcon,
   Users,
@@ -264,6 +265,16 @@ export default function More() {
                   description="Master-only management"
                   Icon={Users}
                   testid="more-shortcut-staff"
+                  accent
+                />
+              </li>
+              <li>
+                <ShortcutLink
+                  to="/admin"
+                  label="Shops & pricing"
+                  description="Branches, TfL zones and zone-adjustment rules"
+                  Icon={Store}
+                  testid="more-shortcut-admin"
                   accent
                 />
               </li>

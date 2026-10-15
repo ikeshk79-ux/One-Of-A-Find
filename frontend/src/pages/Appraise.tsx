@@ -28,7 +28,9 @@ import ValueDisplay from "@/components/common/ValueDisplay";
 import ConfidenceBadge from "@/components/common/ConfidenceBadge";
 import WhyThisEstimate from "@/components/common/WhyThisEstimate";
 import { apiPost } from "@/lib/api";
-import { gbp, CATEGORIES, LOCATIONS, sizeOptionsFor, CONDITION_OPTIONS, CONDITION_MULTIPLIERS, adjustedCharityPrice } from "@/lib/types";
+import { gbp, CATEGORIES, sizeOptionsFor, CONDITION_OPTIONS, CONDITION_MULTIPLIERS, adjustedCharityPrice } from "@/lib/types";
+import { useShopNames } from "@/hooks/useShops";
+import ZoneAdjustmentHint from "@/components/common/ZoneAdjustmentHint";
 import { getSessionLocation, useSessionLocation } from "@/lib/sessionLocation";
 import FirstRunGuide from "@/components/FirstRunGuide";
 import type { Appraisal, InventoryItem } from "@/lib/types";
@@ -133,6 +135,7 @@ export default function Appraise() {
   const [result, setResult] = useState<Appraisal | null>(null);
   const [category, setCategory] = useState<string>("Women's tops");
   const [location, setLocation] = useState<string>(getSessionLocation());
+  const shopNames = useShopNames();
   const [size, setSize] = useState<string>("");
   const [extraImages, setExtraImages] = useState<string[]>([]);
   const [camera, setCamera] = useState<"item" | "label" | "extra" | null>(null);
@@ -803,13 +806,17 @@ export default function Appraise() {
                   <SelectValue>{(v) => v as string}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {LOCATIONS.map((l) => (
+                  {shopNames.map((l) => (
                     <SelectItem key={l} value={l} data-testid={`appraisal-location-${l}`}>
                       {l}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <ZoneAdjustmentHint
+                location={location}
+                basePrice={result?.recommended_price ?? 0}
+              />
             </div>
 
             <div className="mt-6 space-y-2">

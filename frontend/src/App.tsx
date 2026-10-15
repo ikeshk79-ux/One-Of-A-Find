@@ -19,6 +19,7 @@ const TagPage = lazy(() => import("@/pages/TagPage"));
 const PrintTags = lazy(() => import("@/pages/PrintTags"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Staff = lazy(() => import("@/pages/Staff"));
+const Admin = lazy(() => import("@/pages/Admin"));
 
 function RouteFallback() {
   return (
@@ -91,6 +92,7 @@ export default function App() {
       <Route path="/print-tags" element={lazyGated(<PrintTags />)} />
       <Route path="/activity" element={lazyGated(<Activity />)} />
       <Route path="/volunteers" element={lazyGated(<Staff />)} />
+      <Route path="/admin" element={lazyGated(<Admin />)} />
     </Routes>
   );
 }
