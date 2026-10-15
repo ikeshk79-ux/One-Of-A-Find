@@ -28,8 +28,16 @@ on mobile with Scan floating as a large central circular CTA. All legacy URLs (`
   box is empty it lists the last 4 **recently opened** items (ids kept in `localStorage` under
   `recent-items` by `lib/recentItems.ts`, written from `TagPage`); a scan button opens `BarcodeScanner`
   and resolves the tag's barcode/QR via `lib/scan.ts` → `resolveScannedCode()` (QR deep-link `/tag/<uuid>`
-  or SKU through `GET /inventory/lookup?sku=`, shared with `/inventory`). Status filter (`all / available
-  / sold / PAT pending`); mobile users jump to `/inventory` for the full admin view.
+  or SKU through `GET /inventory/lookup?sku=`, shared with `/inventory`). **Till mode**: a successful
+  scan no longer navigates — it opens `components/common/TillSellDialog.tsx`, a one-tap sell
+  confirmation showing the item thumbnail/brand/SKU and the tag price, with a large "Mark sold ·
+  £x" button that PATCHes `/inventory/:id/sell` **always at `recommended_price`** (no price override
+  at the till — staff who need to change anything tap "Open item" to reach `/tag/:id`). Already-sold
+  items show a "was already sold" notice instead. Success invalidates `inventory`/`stats`/`activity`.
+  Status filter (`all / available / sold / PAT pending`) plus a **condition filter** dropdown
+  (`finds-condition-filter`, "Any condition" + the 7 `CONDITION_OPTIONS` tiers, client-side exact
+  match on `item.condition`); "Clear filters" resets search, status and condition together. Mobile
+  users jump to `/inventory` for the full admin view.
 - `pages/More.tsx` — settings hub: profile (reuses `/auth/profile` PATCH), branch via
   `LocationSwitcher`, theme picker (forest-light/forest-dark/obsidian/sunroom), shortcuts, master-only
   entries to `/activity` and `/volunteers`, Help, About, Sign out.

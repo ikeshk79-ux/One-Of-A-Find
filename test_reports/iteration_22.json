@@ -1,0 +1,43 @@
+{
+  "iteration": 22,
+  "mode": "retest",
+  "summary": "Retest of iteration_21's single open bug: the Finds condition-filter trigger label. Fix confirmed - Finds.tsx now maps the raw 'all' value to the 'Any condition' label via a SelectValue render function, and the selected tier's own name (e.g. 'Good') renders correctly once chosen. Re-ran the full backend pytest suite (same 75/80, the 5 failures are the pre-existing out-of-scope issues from iterations 19-21) and re-ran all 3 Finds condition-filter browser checks by name. Two passed unchanged; one (finds-clear-filters-resets-search-status-condition) failed on first rerun because its own prior assertion had been written to match the old buggy 'all' text - updated that check's expectation to 'Any condition' (a check-script fix, not an app bug) and it now passes. Also re-verified finds-condition-filter-narrows-grid against the public preview URL.",
+  "passed": 4,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Backend suite regression (pre-existing out-of-scope failures remain isolated from till/condition-filter work)",
+      "name": "pytest full suite",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "75/80 passed. 5 failures unchanged from iteration_21/20/19: test_tscheck_shops_seeded_data.py (shops count 13 vs expected 14 - stale fixture residue), test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal and 2 related appraise-robustness tests (missing /tmp/item.jpg live-model fixture). None touch Finds or the condition filter."
+    },
+    {
+      "criterion": "Finds condition filter trigger shows the correct label (bugs[0] from iteration_21)",
+      "name": "finds-condition-filter-narrows-grid",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check (localhost and again against https://thrift-vision.preview.emergentagent.com): defaultTriggerText contains 'Any condition' on load; after selecting Good the trigger screenshot shows 'Good' label with finds-count narrowed to 3 items matching the API's condition==='Good' set exactly (cardIds==goodIds); reselecting 'all' option restores trigger text to 'Any condition' and finds-count back to the full total. Fix verified: Finds.tsx's <SelectValue> now renders via a mapping function instead of printing the raw stored value."
+    },
+    {
+      "criterion": "Condition filter composes with the status and PAT filters (regression)",
+      "name": "finds-condition-filter-composes-with-status-filter",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: Good+Available intersection and Good+PAT-pending intersection (empty, correctly showing finds-empty) both matched the API cross-check exactly."
+    },
+    {
+      "criterion": "Clear filters resets all three filters, trigger showing 'Any condition' after reset",
+      "name": "finds-clear-filters-resets-search-status-condition",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "First rerun of the unchanged persisted script failed because the script's own assertion (written during iteration_21 to document the then-current bug) expected the trigger to contain the literal substring 'all', but the fixed UI now correctly renders 'Any condition' - a stale-check issue, not an app bug. Updated the check's assertion from toContainText('all') to toContainText('Any condition') and reran inline: search+status+condition combo yields finds-empty with finds-empty-reset shown; tapping it clears search to '', re-selects finds-filter-all, restores condition trigger text to 'Any condition', and finds-count returns to the full total. Removed the stray .backup file created by the overwrite."
+    }
+  ],
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false
+}

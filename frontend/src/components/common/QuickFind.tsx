@@ -4,6 +4,7 @@ import { Clock, Package, ScanLine, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import TillSellDialog from "@/components/common/TillSellDialog";
 import { ApiError } from "@/lib/api";
 import { getRecentItemIds } from "@/lib/recentItems";
 import { resolveScannedCode } from "@/lib/scan";
@@ -24,7 +25,8 @@ export function matchesQuery(item: InventoryItem, needle: string): boolean {
 }
 
 /** Search box with a typeahead dropdown (tap a suggestion to open its price tag), a
- * recently-viewed list when empty, and a scan button that resolves a tag's barcode/QR. */
+ * recently-viewed list when empty, and a scan button for till mode — scanning a tag's
+ * barcode/QR opens a one-tap "mark sold" dialog at the tag price. */
 export default function QuickFind({
   query,
   onQueryChange,
@@ -41,6 +43,8 @@ export default function QuickFind({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [scanOpen, setScanOpen] = useState(false);
+  // Till mode: a successful scan opens the one-tap sell dialog rather than the tag page.
+  const [tillItemId, setTillItemId] = useState<string | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>(() => getRecentItemIds());
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -90,7 +94,7 @@ export default function QuickFind({
         }
         setScanOpen(false);
         if (hit.title) toast.success(`Found: ${hit.title}`);
-        navigate(`/tag/${hit.id}`);
+        setTillItemId(hit.id);
       } catch (err) {
         toast.error(
           err instanceof ApiError && err.status === 404
@@ -99,7 +103,7 @@ export default function QuickFind({
         );
       }
     },
-    [navigate],
+    [],
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -174,8 +178,8 @@ export default function QuickFind({
         <button
           type="button"
           onClick={() => setScanOpen(true)}
-          aria-label="Scan a price tag to find an item"
-          title="Scan a tag"
+          aria-label="Scan a price tag to sell at the till"
+          title="Scan to sell"
           className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
           data-testid={`${testidPrefix}-scan-button`}
         >
@@ -241,6 +245,11 @@ export default function QuickFind({
       )}
 
       <BarcodeScanner open={scanOpen} onClose={() => setScanOpen(false)} onDetected={handleScan} />
+      <TillSellDialog
+        itemId={tillItemId}
+        open={tillItemId !== null}
+        onClose={() => setTillItemId(null)}
+      />
     </div>
   );
 }

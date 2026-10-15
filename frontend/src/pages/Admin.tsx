@@ -83,6 +83,7 @@ export default function Admin() {
 
       <ShopsSection />
       <RulesSection />
+      <AuditSection />
     </div>
   );
 }
@@ -446,8 +447,167 @@ function ShopEditDialog({
 }
 
 // -----------------------------------------------------------------------------
-// Pricing rules section — zone→% table, versioned on save
+// Pricing audit section — master dashboard over db.pricing_ledger with CSV export
 // -----------------------------------------------------------------------------
+interface LedgerRow {
+  id: string;
+  created_at: string;
+  item_id: string;
+  item_title: string;
+  item_sku: string;
+  item_status: string;
+  shop_name: string | null;
+  zone: number | string | null;
+  base_price: number;
+  adjustment_percent: number;
+  final_price: number;
+  rule_version: number;
+  actor: string;
+  reason: string;
+}
+
+function fmtGbp(n: number): string {
+  return `£${n.toFixed(0)}`;
+}
+
+function AuditSection() {
+  const rows = useQuery<LedgerRow[]>({
+    queryKey: ["pricing", "audit"],
+    queryFn: () => apiGet<LedgerRow[]>("/pricing/audit?limit=100"),
+  });
+
+  const downloadCsv = async () => {
+    try {
+      // apiGet forces JSON parsing — hit fetch directly so the browser can save the CSV body.
+      const res = await fetch("/api/pricing/audit.csv", {
+        credentials: "include",
+        headers: {
+          "X-CSRF-Token":
+            sessionStorage.getItem("csrfToken") ?? "",
+        },
+      });
+      if (!res.ok) throw new Error(`CSV download failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pricing-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "CSV download failed");
+    }
+  };
+
+  return (
+    <section className="space-y-3" data-testid="admin-audit">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-serif text-lg text-foreground">Pricing audit</h2>
+          <p className="text-xs text-muted-foreground">
+            Each saved valuation records the base price, the zone adjustment and the final price,
+            tied to the pricing-rule version it used. Newest first.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={downloadCsv}
+          data-testid="admin-audit-csv"
+          className="gap-2"
+        >
+          Export CSV
+        </Button>
+      </div>
+
+      {rows.isLoading ? (
+        <div className="flex items-center justify-center p-6 text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" />
+        </div>
+      ) : (rows.data ?? []).length === 0 ? (
+        <div
+          className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground"
+          data-testid="admin-audit-empty"
+        >
+          No pricing ledger entries yet. New items filed to a shop with a mapped zone will show
+          up here.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" data-testid="admin-audit-table">
+              <thead className="bg-muted/50 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="whitespace-nowrap px-3 py-2">When</th>
+                  <th className="whitespace-nowrap px-3 py-2">Item</th>
+                  <th className="whitespace-nowrap px-3 py-2">Shop</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center">Zone</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-right">Base</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center">Adj</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-right">Final</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center">v</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(rows.data ?? []).map((r) => (
+                  <tr key={r.id} data-testid={`admin-audit-row-${r.id}`}>
+                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                      {new Date(r.created_at).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </td>
+                    <td className="min-w-0 px-3 py-2">
+                      <span className="block max-w-[180px] truncate font-medium text-foreground">
+                        {r.item_title || <span className="text-muted-foreground">—</span>}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {r.item_sku ? `SKU ${r.item_sku.slice(-6)}` : ""}
+                        {r.reason ? ` · ${r.reason}` : ""}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                      {r.shop_name ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-center">
+                      {r.zone === null || r.zone === undefined
+                        ? "—"
+                        : typeof r.zone === "number"
+                          ? `Z${r.zone}`
+                          : r.zone}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums">
+                      {fmtGbp(r.base_price)}
+                    </td>
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-3 py-2 text-center font-mono tabular-nums",
+                        r.adjustment_percent < 0 && "text-destructive",
+                        r.adjustment_percent > 0 && "text-primary",
+                      )}
+                    >
+                      {r.adjustment_percent > 0 ? "+" : ""}
+                      {r.adjustment_percent}%
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums font-semibold text-foreground">
+                      {fmtGbp(r.final_price)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-center text-muted-foreground">
+                      v{r.rule_version}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const RULE_KEYS: readonly { key: string; label: string }[] = [
   { key: "1", label: "Zone 1" },
   { key: "2", label: "Zone 2" },

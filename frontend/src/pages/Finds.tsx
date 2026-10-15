@@ -18,8 +18,15 @@ import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiGet } from "@/lib/api";
-import { gbp } from "@/lib/types";
+import { CONDITION_OPTIONS, gbp } from "@/lib/types";
 import type { InventoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +52,7 @@ export default function Finds() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [condition, setCondition] = useState<string>("all");
   const inventory = useQuery({
     queryKey: ["inventory"],
     queryFn: () => apiGet<InventoryItem[]>("/inventory"),
@@ -59,10 +67,19 @@ export default function Finds() {
       if (status === "pat-pending") {
         if (!item.is_electrical || item.pat_passed) return false;
       }
+      if (condition !== "all" && item.condition !== condition) return false;
       if (!needle) return true;
       return matchesQuery(item, needle);
     });
-  }, [inventory.data, query, status]);
+  }, [inventory.data, query, status, condition]);
+
+  const filtersActive = Boolean(query) || status !== "all" || condition !== "all";
+
+  const resetFilters = () => {
+    setQuery("");
+    setStatus("all");
+    setCondition("all");
+  };
 
   return (
     <div className="animate-rise space-y-6 pb-6">
@@ -87,7 +104,29 @@ export default function Finds() {
       {/* Search + filter row */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <QuickFind query={query} onQueryChange={setQuery} items={inventory.data ?? []} />
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by status">
+        <Select value={condition} onValueChange={setCondition}>
+          <SelectTrigger
+            className="h-11 w-full rounded-full sm:w-48"
+            aria-label="Filter by condition"
+            data-testid="finds-condition-filter"
+          >
+            <SelectValue placeholder="Any condition">
+              {(v) => (v === "all" ? "Any condition" : (v as string))}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" data-testid="finds-condition-option-all">
+              Any condition
+            </SelectItem>
+            {CONDITION_OPTIONS.map((c) => (
+              <SelectItem key={c} value={c} data-testid={`finds-condition-option-${c}`}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by status">
           {(
             [
               { id: "all" as const, label: "All" },
@@ -114,7 +153,6 @@ export default function Finds() {
               {f.label}
             </button>
           ))}
-        </div>
       </div>
 
       {inventory.isPending ? (
@@ -136,23 +174,16 @@ export default function Finds() {
         />
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={query || status !== "all" ? Search : Sparkles}
-          title={query || status !== "all" ? "No matches" : "No finds yet"}
+          icon={filtersActive ? Search : Sparkles}
+          title={filtersActive ? "No matches" : "No finds yet"}
           description={
-            query || status !== "all"
-              ? "Try a different search or clear the filter."
+            filtersActive
+              ? "Try a different search or clear the filters."
               : "Scan your first item to start building your inventory."
           }
           action={
-            query || status !== "all" ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setQuery("");
-                  setStatus("all");
-                }}
-                data-testid="finds-empty-reset"
-              >
+            filtersActive ? (
+              <Button variant="outline" onClick={resetFilters} data-testid="finds-empty-reset">
                 Clear filters
               </Button>
             ) : (

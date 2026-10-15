@@ -1,0 +1,94 @@
+{
+  "iteration": 21,
+  "mode": "generate",
+  "summary": "Till mode (scan-to-sell at the till) and the Finds condition filter: 7 of 8 acceptance criteria verified clean; 1 real frontend display bug found (condition-filter trigger shows the raw value 'all' instead of the 'Any condition' label — functional filtering itself works correctly). Backend: new pytest file covers PATCH /inventory/{id}/sell at recommended_price and the reversible un-sell. Browser: updated the two now-stale QuickFind scan checks (they asserted the old 'scan navigates to /tag' behavior, which the new spec deliberately replaced with the till dialog) plus 6 new named checks for sell-at-tag-price, already-sold handling, the Open-item escape hatch, condition-filter narrowing, condition+status composition, and clear-filters reset. One check re-ran against the public preview URL. Full backend suite re-run: 75/80 passing — the 5 failures are the same pre-existing, out-of-scope issues already flagged in iterations 19/20 (shops-count==14 residue from an earlier session's test data, and a missing /tmp/item.jpg live-model fixture for 2 real-appraise tests); none touch till mode or the condition filter.",
+  "passed": 9,
+  "failed": 1,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Till mode: scanning a tag opens the sell dialog instead of navigating",
+      "name": "quickfind-scan-button-manual-sku",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /finds (390x844, master login): scan icon opens scanner-dialog; bogus SKU '000000' shows 'No item matches that barcode' toast, scanner stays open, URL stays /finds, till-sell-dialog count 0; known SKU 523597982856 closes scanner-dialog (count 0), opens till-sell-dialog, till-item-title='tscheck-condition-edit jacket', till-tag-price='£20.00', URL stayed /finds throughout (no navigation to /tag/:id). Also re-verified the Home-mounted QuickFind instance in home-find-scan-button-manual-sku with identical results."
+    },
+    {
+      "criterion": "Till mode: one tap marks the item sold at the tag price",
+      "name": "till-sell-marks-item-sold-at-tag-price",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-till-sell-<ts> via POST /api/inventory (recommended_price 27.5). Scanned its SKU -> till-sell-dialog shows title + '£27.50'; till-override-input absent (count 0). Tapped till-confirm-sell -> toast 'Sold: tscheck-till-sell-<ts> · £27.50' visible, dialog closed (count 0). finds-card-{id}-sold badge visible in grid; item also appears under the Sold status filter. Cross-check GET /api/inventory/{id}: status='sold', sold_price=27.5, recommended_price=27.5 (exact match). Re-ran the same check against https://thrift-vision.preview.emergentagent.com - passed identically."
+    },
+    {
+      "criterion": "Till mode: already-sold item is rejected gracefully",
+      "name": "till-already-sold-shows-graceful-message",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-till-already-sold-<ts> then PATCH'd it sold via API (sold_price 15). Scanning its SKU opened till-sell-dialog showing till-already-sold text containing the title and '£15.00'; till-confirm-sell absent (count 0); only till-close button present and functional."
+    },
+    {
+      "criterion": "Till mode: unknown barcode",
+      "name": "quickfind-scan-button-manual-sku (bogus-sku branch)",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Manual SKU '000000' -> toast 'No item matches that barcode' shown, till-sell-dialog never created (count 0), scanner-dialog remained open."
+    },
+    {
+      "criterion": "Till mode: 'Open item' escape hatch",
+      "name": "till-open-item-escape-hatch",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-till-open-item-<ts>, scanned its SKU to open till-sell-dialog, tapped till-open-item -> dialog closed (count 0), URL became /tag/{id}, tag-price visible. Cross-check GET /api/inventory/{id}: status still 'available' (no sale happened)."
+    },
+    {
+      "criterion": "Finds condition filter narrows the grid",
+      "name": "finds-condition-filter-narrows-grid",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "BUG: finds-condition-filter trigger renders the literal selected value instead of its label. Default/reset state shows text 'all' (expected 'Any condition'). Functional behavior is otherwise correct: selecting finds-condition-option-Good narrowed finds-count from the full total to exactly the API's count of condition==='Good' items, and the visible finds-card-<id> set equalled that exact id set (cross-checked via GET /api/inventory); reselecting 'Any condition' restored the full count. Screenshot: finds-condition-filter-narrows-grid-failure.png shows the trigger reading 'all\u25bc'. Backend cross-check: GET /api/inventory -> 401 without auth / 200 with auth, confirming the API is healthy and this is a frontend render-only defect (Finds.tsx's <SelectValue placeholder=\"Any condition\" /> has no render-function children, unlike every other Select in this codebase e.g. Inventory.tsx's <SelectValue>{(v) => v === 'all' ? 'All categories' : v}</SelectValue>, so base-ui's Select.Value prints the raw value once one is selected instead of the placeholder)."
+    },
+    {
+      "criterion": "Condition filter composes with the status and PAT filters",
+      "name": "finds-condition-filter-composes-with-status-filter",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Good + Available: finds-count and the visible finds-card-<id> set both matched the API intersection of condition==='Good' && status==='available' exactly (not the condition-only or status-only counts). Good + PAT pending: matched the condition==='Good' && is_electrical && !pat_passed intersection (empty in this dataset, correctly rendered finds-empty rather than falling back to either single filter)."
+    },
+    {
+      "criterion": "Clear filters resets all three filters",
+      "name": "finds-clear-filters-resets-search-status-condition",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Search 'zzz-tscheck-no-such-item-zzz' + status Available + condition Good -> finds-empty with finds-empty-reset shown. Tapping it: finds-search value cleared to '', finds-filter-all aria-selected='true', condition trigger back to its default value state ('all' - see the separate label-text bug above), finds-count restored to the original full total."
+    },
+    {
+      "criterion": "Till sell endpoint contract (API)",
+      "name": "pytest tests/test_tscheck_till_mark_sold.py::test_sell_marks_item_sold_at_recommended_price",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /inventory (tscheck-till-sell-item, recommended_price 27.5) -> 201. PATCH /inventory/{id}/sell {sold:true, sold_price:27.5} -> 200, status='sold', sold_price==27.5==recommended_price. PATCH {sold:false} -> 200, status='available'."
+    },
+    {
+      "criterion": "Till sell is reversibly un-sellable (supports seed_facts restore workflow)",
+      "name": "pytest tests/test_tscheck_till_mark_sold.py::test_unsell_restores_available_status",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PATCH /inventory/{id}/sell {sold:true,...} -> 200 status='sold'; GET /inventory/{id} -> sold_price==recommended_price; PATCH {sold:false} -> 200, status='available', sold_price=null."
+    }
+  ],
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "Finds condition filter narrows the grid",
+      "description": "The Finds condition-filter trigger (data-testid finds-condition-filter) displays the raw selected value ('all') instead of its label ('Any condition') because frontend/src/pages/Finds.tsx passes `<SelectValue placeholder=\"Any condition\" />` with no render-function children. Every other Select in the codebase (Inventory.tsx category/location/size/sort filters, Activity.tsx, Appraise.tsx) passes `<SelectValue>{(v) => ...label...}</SelectValue>` to map the stored value to display text; Finds.tsx's condition filter is missing that mapping, so base-ui's Select.Value falls through to printing the raw value once a value is set (the placeholder only renders when the value is empty/undefined, and the default value here is the non-empty string 'all'). Filtering logic itself is unaffected — only the label text is wrong, both on initial load and after 'Clear filters'.",
+      "evidence": "Screenshot finds-condition-filter-narrows-grid-failure.png: trigger reads 'all▼'. Fix suggestion: `<SelectValue placeholder=\"Any condition\">{(v) => (v === 'all' ? 'Any condition' : (v as string))}</SelectValue>`."
+    }
+  ],
+  "action_items": [
+    "Fix Finds.tsx condition-filter SelectValue to render the 'Any condition' label for value==='all' (see bugs[0])."
+  ],
+  "retest_needed": true
+}
