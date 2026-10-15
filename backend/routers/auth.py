@@ -31,7 +31,6 @@ from lib.auth import (
 from lib.activity import log_activity
 from lib.db import db
 from models.appraisal import (
-    AVATAR_COLORS,
     LoginRequest,
     ProfileUpdate,
     RegisterRequest,

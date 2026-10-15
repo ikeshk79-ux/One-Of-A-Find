@@ -12,8 +12,8 @@ function read(): string {
   try {
     const v = localStorage.getItem(KEY);
     if (v && (LOCATIONS as readonly string[]).includes(v)) return v;
-  } catch {
-    /* ignore */
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn("session-location: unreadable store", err);
   }
   return LOCATIONS[0];
 }
@@ -29,8 +29,10 @@ export function setSessionLocation(loc: string): void {
   current = loc;
   try {
     localStorage.setItem(KEY, loc);
-  } catch {
-    /* ignore */
+  } catch (err) {
+    // The in-memory store still updates, so the branch switch works for this session even if the
+    // write fails (private mode / quota).
+    if (import.meta.env.DEV) console.warn("session-location: could not persist", err);
   }
   listeners.forEach((l) => l());
 }

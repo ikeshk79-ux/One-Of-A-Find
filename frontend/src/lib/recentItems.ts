@@ -9,7 +9,8 @@ export function getRecentItemIds(): string[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
-  } catch {
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn("recent-items: unreadable store", err);
     return [];
   }
 }
@@ -19,7 +20,9 @@ export function pushRecentItemId(id: string): void {
   try {
     const next = [id, ...getRecentItemIds().filter((v) => v !== id)].slice(0, MAX);
     localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    // Private-mode / quota failures are not worth surfacing — recents are a convenience only.
+  } catch (err) {
+    // Private-mode / quota failures are not worth surfacing to the volunteer — recents are a
+    // convenience only — but they should not vanish silently in development either.
+    if (import.meta.env.DEV) console.warn("recent-items: could not persist", err);
   }
 }
