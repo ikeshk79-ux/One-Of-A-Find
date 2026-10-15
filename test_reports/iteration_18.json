@@ -1,0 +1,42 @@
+{
+  "iteration": 18,
+  "mode": "retest",
+  "summary": "New criteria for the location-preview feature all verified. Backend: new /api/inventory/{id}/location-preview endpoint rebases price without mutating state (422 for unknown location, 404 for bogus item, no ledger writes). Frontend: edit-details dialog auto-rebases the price field when the shop changes on a charity-sourced item (Tooting->Brompton Road 72->80, ->Ealing 80->72), and preserves a volunteer's manual price override when location changes afterwards. Also re-ran the previous iteration's regression check (shop CRUD master-only) - still green.",
+  "passed": 4,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "New backend endpoint GET /api/inventory/{item_id}/location-preview rebases the item's price for a new shop without touching DB state",
+      "name": "pytest tests/test_tscheck_location_preview_endpoint.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "1 passed in 0.97s. GET /api/inventory/{id}/location-preview?location=Brompton%20Road -> 200 {base_price:80, final_price:80, zone:1, adjustment_percent:0}; ?location=Ealing -> 200 {base_price:80, final_price:72, zone:3, adjustment_percent:-10}; ?location=Nowhere -> 422; /inventory/not-a-real-item-id/location-preview -> 404. Post-call DB check: item.recommended_price still 72, item.location still 'Tooting', pricing_ledger row count for item unchanged (1, from creation) after all preview calls. Fixture item cleaned up via DELETE."
+    },
+    {
+      "criterion": "Edit-details dialog auto-updates the displayed price when the shop changes on a charity-sourced item",
+      "name": "edit-dialog-location-change-rebases-charity-price",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On 390x844 viewport, master login, created tscheck fixture item at Tooting (Z3 -10%) with recommended_price 80 -> stored 72. Opened /tag/<id> edit dialog: edit-price-input started at 72. Changed edit-location-select to 'Brompton Road' (Z1 0%) -> edit-price-input auto-updated to 80, zone-adjustment-hint visible. Changed to 'Ealing' (Z3 -10%) -> edit-price-input auto-updated to 72, hint visible. No console errors, no API responses >=400. Screenshots: after-brompton-road, after-ealing."
+    },
+    {
+      "criterion": "Edit-details dialog respects a manual price override: changing location on a 'custom'/'peak' item does NOT auto-rebase",
+      "name": "edit-dialog-manual-price-override-not-rebased",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same fixture pattern (Tooting, charity, start price 72). Typed 99 into edit-price-input (flips price_source to custom client-side). Changed location to Brompton Road then Ealing - edit-price-input remained 99 after each change (no auto-rebase), zone-adjustment-hint still rendered under the dropdown both times. Screenshot: manual-price-preserved-after-location-change."
+    },
+    {
+      "criterion": "Regression re-check from iteration 17 (shop CRUD master-only)",
+      "name": "pytest tests/test_tscheck_shop_crud_master_only.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "2 passed in <1s, no regression."
+    }
+  ],
+  "action_items": [],
+  "retest_needed": false
+}

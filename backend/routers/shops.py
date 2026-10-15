@@ -90,17 +90,41 @@ async def update_shop(shop_id: str, body: ShopUpdate, session: dict = Depends(re
     return Shop(**_aware(doc))
 
 
-@router.delete("/{shop_id}", response_model=Shop)
-async def disable_shop(shop_id: str, _: dict = Depends(require_master)):
-    """Soft-delete so inventory rows that reference this shop by name still render."""
-    doc = await db.shops.find_one_and_update(
+@router.delete("/{shop_id}")
+async def delete_shop(
+    shop_id: str,
+    mode: str = Query(default="disable"),
+    _: dict = Depends(require_master),
+):
+    """Delete a shop. Defaults to a soft-disable so existing inventory items that reference
+    this shop by name continue to render. Pass `?mode=remove` to hard-delete; the request is
+    rejected with 409 if any inventory item still references the shop so the admin can either
+    disable instead or reassign items first."""
+    doc = await db.shops.find_one({"id": shop_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Shop not found")
+
+    if mode == "remove":
+        linked = await db.inventory.count_documents({"location": doc["name"]})
+        if linked > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{linked} item{'s' if linked != 1 else ''} still reference this shop — reassign or disable instead",
+            )
+        await db.shops.delete_one({"id": shop_id})
+        from models.shop import Shop
+
+        return Shop(**_aware(doc))
+
+    # Default: soft-disable (back-compat with the previous DELETE contract).
+    updated = await db.shops.find_one_and_update(
         {"id": shop_id},
         {"$set": {"disabled": True, "updated_at": datetime.now(timezone.utc)}},
         return_document=True,
     )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Shop not found")
-    return Shop(**_aware(doc))
+    from models.shop import Shop
+
+    return Shop(**_aware(updated))
 
 
 # -----------------------------------------------------------------------------

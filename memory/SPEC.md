@@ -152,6 +152,23 @@ recomputes canonically on save.
 dropdowns, falls back to the static LOCATIONS tuple while loading), and `usePricingRules`.
 Mirror interfaces (`Shop`, `PricingRules`, `PriceAdjustmentPreview`) live in `src/lib/types.ts`.
 
+### Capture-studio hero location (2026-10-15)
+The "Capture studio · Point. Shoot. Appraise." hero now lives **only on Home** (`pages/Home.tsx`,
+replacing the previous "Scan an item" card at `data-testid="home-scan-card"`). The `/scan` route
+is a thin wrapper that just renders `<Appraise />` — the hero no longer appears on the capture
+flow once the volunteer has tapped through from Home.
+
+### Shop deletion modes (2026-10-15)
+`DELETE /api/shops/{id}` is now two-mode:
+- Default (`?mode=disable` or no param) soft-disables (sets `disabled=true`) — back-compat with
+  the previous contract so existing inventory items that reference the shop by name still render.
+- `?mode=remove` **hard-deletes** the row. Returns 409 with
+  `"N item(s) still reference this shop — reassign or disable instead"` if any inventory row's
+  `location` matches the shop name, so the admin can reassign or soft-disable first.
+Admin UI exposes both as separate buttons in the shop edit dialog ("Disable" / "Delete",
+testids `admin-shop-disable` / `admin-shop-delete`); Delete opens a browser `window.confirm`
+before firing.
+
 ## Appraisal response parsing (grounded Gemini)
 `POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the
 model wrap its JSON in citation prose or code fences. `_parse_appraisal()` in

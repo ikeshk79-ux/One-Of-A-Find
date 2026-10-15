@@ -27,6 +27,8 @@ import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { pushRecentItemId } from "@/lib/recentItems";
 import { gbp, BLURB_TONES, CATEGORIES, LOCATIONS, CONDITION_OPTIONS, sizeOptionsFor, adjustedCharityPrice, charityGuidePrice } from "@/lib/types";
 import type { InventoryItem } from "@/lib/types";
+import { useShopNames } from "@/hooks/useShops";
+import ZoneAdjustmentHint from "@/components/common/ZoneAdjustmentHint";
 
 export default function TagPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +38,7 @@ export default function TagPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editCategory, setEditCategory] = useState<string>(CATEGORIES[0]);
   const [editLocation, setEditLocation] = useState<string>(LOCATIONS[0]);
+  const editShopNames = useShopNames();
   const [editTitle, setEditTitle] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editSize, setEditSize] = useState("");
@@ -643,18 +646,40 @@ export default function TagPage() {
               <Label htmlFor="edit-location" className="text-xs uppercase tracking-widest">
                 Shop location
               </Label>
-              <Select value={editLocation} onValueChange={setEditLocation}>
+              <Select
+                value={editLocation}
+                onValueChange={(next) => {
+                  const previous = editLocation;
+                  setEditLocation(next);
+                  // Match the backend PATCH behaviour: when the shop changes and the price is
+                  // still the AI-derived "charity" value, auto-rebase to the new shop's zone.
+                  // Custom/peak overrides are left alone so the volunteer doesn't lose a manual
+                  // price slip.
+                  if (next === previous || editPriceSource !== "charity" || !data?.id) return;
+                  apiGet<{ final_price: number; adjustment_percent: number }>(
+                    `/inventory/${data.id}/location-preview?location=${encodeURIComponent(next)}`,
+                  )
+                    .then((p) => setEditPrice(String(p.final_price)))
+                    .catch(() => {
+                      /* preview is advisory — a failure leaves the price alone, backend recomputes on save */
+                    });
+                }}
+              >
                 <SelectTrigger id="edit-location" className="bg-obsidian" data-testid="edit-location-select">
                   <SelectValue>{(v) => v as string}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {LOCATIONS.map((l) => (
+                  {editShopNames.map((l) => (
                     <SelectItem key={l} value={l} data-testid={`edit-location-${l}`}>
                       {l}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <ZoneAdjustmentHint
+                location={editLocation}
+                basePrice={Number(editPrice) || 0}
+              />
             </div>
           </div>
           <DialogFooter>

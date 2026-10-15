@@ -295,6 +295,18 @@ function ShopEditDialog({
     onError: (e: Error) => toast.error(e.message || "Re-enable failed"),
   });
 
+  const remove = useMutation({
+    // Hard-delete via ?mode=remove. The backend refuses with 409 if any inventory item still
+    // references the shop by name, so the admin can either reassign items first or soft-disable.
+    mutationFn: async () => apiDelete<Shop>(`/shops/${shop!.id}?mode=remove`),
+    onSuccess: () => {
+      toast.success("Shop deleted");
+      onSaved();
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message || "Delete failed"),
+  });
+
   return (
     <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : undefined)}>
       <DialogContent data-testid="admin-shop-dialog">
@@ -369,7 +381,7 @@ function ShopEditDialog({
             </span>
           </label>
         </div>
-        <DialogFooter className="flex-row items-center justify-between gap-2">
+        <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2">
           {!isNew &&
             (shop?.disabled ? (
               <Button
@@ -382,17 +394,36 @@ function ShopEditDialog({
                 Re-enable
               </Button>
             ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                onClick={() => disable.mutate()}
-                disabled={disable.isPending}
-                data-testid="admin-shop-disable"
-              >
-                <Trash2 className="size-4" />
-                Disable
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => disable.mutate()}
+                  disabled={disable.isPending}
+                  data-testid="admin-shop-disable"
+                >
+                  Disable
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => {
+                    if (
+                      typeof window !== "undefined" &&
+                      !window.confirm(`Permanently delete "${shop?.name}"? This cannot be undone.`)
+                    )
+                      return;
+                    remove.mutate();
+                  }}
+                  disabled={remove.isPending}
+                  data-testid="admin-shop-delete"
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+              </div>
             ))}
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onClose}>

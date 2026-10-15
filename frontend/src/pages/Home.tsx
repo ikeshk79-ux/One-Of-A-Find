@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Camera, Compass, Heart, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, Camera, Compass, Heart, Lightbulb, Maximize2, Sparkles, TrendingUp } from "lucide-react";
 import SectionHeader from "@/components/common/SectionHeader";
 import QuickFind from "@/components/common/QuickFind";
 import ValueDisplay from "@/components/common/ValueDisplay";
@@ -79,33 +79,44 @@ export default function Home() {
         </p>
       </section>
 
-      {/* Scan card — the primary action */}
+      {/* Capture studio hero — the primary action, lives on Home only */}
       <button
         type="button"
         onClick={() => navigate("/scan")}
         data-testid="home-scan-card"
         className={cn(
-          "group relative flex w-full flex-col items-start gap-4 overflow-hidden rounded-3xl border p-6 text-left transition-all duration-200",
+          "group relative flex w-full flex-col items-start gap-5 overflow-hidden rounded-3xl border p-6 text-left transition-all duration-200 sm:p-8",
           "border-primary/20 bg-primary text-primary-foreground",
           "hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 active:scale-[0.99]",
         )}
       >
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -right-10 -top-10 size-48 rounded-full bg-primary-foreground/10 blur-2xl"
+          className="pointer-events-none absolute -right-16 -top-20 size-72 rounded-full bg-primary-foreground/10 blur-3xl"
         />
-        <span className="grid size-14 place-items-center rounded-2xl bg-primary-foreground/10 ring-1 ring-primary-foreground/20">
-          <Camera className="size-7" />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -bottom-16 size-72 rounded-full bg-[color-mix(in_oklab,var(--terracotta)_30%,transparent)] blur-3xl"
+        />
+        <span className="relative display-title inline-flex items-center gap-2 rounded-full bg-primary-foreground/10 px-3 py-1 text-[10px] text-primary-foreground/80 ring-1 ring-primary-foreground/15">
+          <Sparkles className="size-3" />
+          Capture studio
         </span>
-        <div className="relative">
-          <p className="display-title text-[11px] text-primary-foreground/70">Appraise</p>
-          <h2 className="heading-title mt-1 text-2xl sm:text-3xl">Scan an item</h2>
-          <p className="mt-1 text-sm text-primary-foreground/80">
-            Take a photo and we'll identify it, price it and spin up a listing — in seconds.
-          </p>
-        </div>
-        <span className="relative mt-auto inline-flex items-center gap-2 rounded-full bg-primary-foreground/10 px-4 py-2 text-sm font-semibold ring-1 ring-primary-foreground/20 transition-transform group-hover:translate-x-1">
-          Open camera <ArrowRight className="size-4" />
+        <h2 className="relative heading-title text-3xl sm:text-4xl" data-testid="home-scan-hero-title">
+          Point. Shoot. Appraise.
+        </h2>
+        <p className="relative max-w-prose text-sm text-primary-foreground/85">
+          Photograph the item and (if you can) its brand label. Our AI investigates what it is, what
+          it's worth, and spins up a listing — in seconds.
+        </p>
+        <ul className="relative grid w-full gap-2" aria-label="Capture tips">
+          <HomeHintChip Icon={Lightbulb} label="Good lighting" description="Daylight works best" />
+          <HomeHintChip Icon={Maximize2} label="Fill the frame" description="Center the item" />
+          <HomeHintChip Icon={Camera} label="Steady hands" description="Hold for the shutter" />
+        </ul>
+        <span className="relative mt-1 inline-flex items-center gap-2 rounded-full bg-primary-foreground px-5 py-3 text-sm font-semibold text-primary transition-transform group-hover:-translate-y-0.5 group-hover:shadow-lg">
+          <Camera className="size-4" />
+          Start capturing
         </span>
       </button>
 
@@ -270,5 +281,27 @@ export default function Home() {
         </section>
       )}
     </div>
+  );
+}
+
+function HomeHintChip({
+  Icon,
+  label,
+  description,
+}: {
+  Icon: typeof Camera;
+  label: string;
+  description: string;
+}) {
+  return (
+    <li className="flex items-start gap-2 rounded-xl bg-primary-foreground/8 px-3 py-2 ring-1 ring-primary-foreground/10">
+      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-primary-foreground/15 text-primary-foreground">
+        <Icon className="size-3.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-semibold text-primary-foreground">{label}</span>
+        <span className="block text-[11px] text-primary-foreground/70">{description}</span>
+      </span>
+    </li>
   );
 }

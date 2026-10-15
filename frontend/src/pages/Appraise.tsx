@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Camera, Check, Copy, Loader2, Plus, Save, Sparkles, Tag as TagIcon, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Camera, Check, Copy, Loader2, Plus, Save, Sparkles, Tag as TagIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -285,9 +285,23 @@ export default function Appraise() {
     save.mutate();
   };
 
+  // The flow is now rendered as four separate screens, derived from existing state so there's
+  // no new source of truth to keep in sync with the mutations:
+  //   savedItem      → "saved" (success card)
+  //   appraise.isPending → "processing" (checklist)
+  //   result         → "results" (valuation + form)
+  //   otherwise      → "capture" (photos)
+  const stage: "capture" | "processing" | "results" | "saved" = savedItem
+    ? "saved"
+    : appraise.isPending
+      ? "processing"
+      : result
+        ? "results"
+        : "capture";
+
   return (
     <div className="space-y-8">
-      {savedItem && (
+      {stage === "saved" && savedItem && (
         <SuccessMoment
           item={savedItem}
           onPrintTag={() => navigate(`/tag/${savedItem.id}`)}
@@ -295,8 +309,10 @@ export default function Appraise() {
           onViewFinds={() => navigate("/finds")}
         />
       )}
-      <div className="grid gap-10 lg:grid-cols-[1fr_1.05fr]">
+      {stage !== "saved" && (
+      <div className="flex flex-col gap-10">
       <FirstRunGuide open={guideOpen} onClose={closeGuide} />
+      {stage === "capture" && (
       <section>
         <div className="flex items-start justify-between gap-3">
           <p className="text-[11px] uppercase tracking-[0.3em] text-gold">Step 01</p>
@@ -504,8 +520,34 @@ export default function Appraise() {
           )}
           {appraise.isPending ? "Appraising…" : "Appraise item"}
         </Button>
-      </section>
 
+        {/* Inline error on Step 01 after an appraisal failure — the user is returned here so
+            they can retry a different photo without losing their inputs. */}
+        {appraise.isError && (
+          <p
+            className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+            data-testid="appraise-error"
+          >
+            Appraisal failed — try another photo or hit Appraise item again.
+          </p>
+        )}
+
+        {/* Step 01 Discard — clears every input and returns the user to a clean Step 01. */}
+        {(itemImage || labelImage || extraImages.length > 0 || notes || giftAidRef || customPrice) && (
+          <Button
+            variant="outline"
+            className="mt-3 w-full"
+            data-testid="capture-discard-button"
+            onClick={resetForNextItem}
+          >
+            <TagIcon className="size-4" />
+            Discard
+          </Button>
+        )}
+      </section>
+      )}
+
+      {(stage === "processing" || stage === "results") && (
       <section>
         <p className="text-[11px] uppercase tracking-[0.3em] text-gold">Step 02</p>
         <h2 className="display-title mt-3 text-2xl text-foreground">Valuation</h2>
@@ -516,22 +558,25 @@ export default function Appraise() {
           </div>
         )}
 
-        {!appraise.isPending && !result && (
-          <div
-            className="mt-7 rounded-xl border border-hairline bg-charcoal p-8 text-sm text-muted-foreground"
-            data-testid="appraisal-empty"
-          >
-            <Camera className="mb-4 size-6 text-gold/70" />
-            No appraisal yet. Add an item photo and press{" "}
-            <span className="text-foreground">Appraise item</span> to see the valuation here.
-          </div>
-        )}
-
         {!appraise.isPending && result && (
           <div
             className="gold-ring mt-7 rounded-xl border border-hairline bg-charcoal p-6"
             data-testid="appraisal-result"
           >
+            <div className="mb-4 flex items-center justify-between">
+              <button
+                type="button"
+                data-testid="results-back-button"
+                onClick={() => setResult(null)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-obsidian px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-gold/60 hover:text-gold"
+              >
+                <ArrowLeft className="size-3.5" />
+                Back
+              </button>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Step 03 · Valuation
+              </span>
+            </div>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -846,7 +891,7 @@ export default function Appraise() {
                 {save.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Save &amp; make tag
               </Button>
-              <Button variant="outline" data-testid="discard-button" onClick={() => setResult(null)}>
+              <Button variant="outline" data-testid="discard-button" onClick={resetForNextItem}>
                 <TagIcon className="size-4" />
                 Discard
               </Button>
@@ -889,7 +934,9 @@ export default function Appraise() {
           </div>
         )}
       </section>
+      )}
       </div>
+      )}
     </div>
   );
 }

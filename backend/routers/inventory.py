@@ -205,6 +205,31 @@ async def get_item(item_id: str, session: dict = Depends(require_session)):
     return _redact(InventoryItem(**_aware(doc)), session)
 
 
+@router.get("/{item_id}/location-preview")
+async def preview_location_change(
+    item_id: str,
+    location: str,
+    _: dict = Depends(require_session),
+):
+    """Preview what the recommended price would become if this item's shop changed to
+    `location`. Matches the PATCH /inventory/{id} re-pricing contract: starts from the item's
+    last ledger entry's base_price (or the current recommended_price if no ledger exists), then
+    applies apply_adjustment() against the new shop. Advisory — saving the PATCH still runs the
+    canonical computation on the backend."""
+    doc = await db.inventory.find_one({"id": item_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if location not in await _active_shop_names():
+        raise HTTPException(status_code=422, detail="Unknown location")
+    last_ledger = await db.pricing_ledger.find_one(
+        {"item_id": item_id}, sort=[("created_at", -1)]
+    )
+    base_price = (
+        float(last_ledger["base_price"]) if last_ledger else float(doc.get("recommended_price", 0))
+    )
+    return await apply_adjustment(base_price, shop_name=location)
+
+
 @router.patch("/{item_id}", response_model=InventoryItem)
 async def update_item(item_id: str, body: ItemUpdate, session: dict = Depends(require_session)):
     """Edit an existing item: title, recommended price, category, shop location and/or size."""

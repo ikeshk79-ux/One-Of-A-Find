@@ -1,0 +1,66 @@
+{
+  "iteration": 20,
+  "mode": "retest",
+  "summary": "New criteria verified: (1) Capture-studio hero renders on Home only with chip/title/hints/CTA, whole card clickable to /scan, and /scan itself is clean of hero chrome while Step 01 + appraise-button remain intact (browser, ran against both localhost and the public preview URL). (2) Shop hard-delete (?mode=remove): a free shop (no inventory refs) hard-deletes and disappears from include_disabled=1; a shop with a referencing inventory item is rejected 409 'still reference this shop'; default DELETE (no mode) still soft-disables in both scenarios; 404 for unknown id; non-master and volunteer callers get 401/403 on both modes (backend pytest, new file). (3) Admin UI shop edit dialog shows both admin-shop-disable and admin-shop-delete; window.confirm()=false blocks the DELETE request, =true fires DELETE /api/shops/{id}?mode=remove and closes the dialog (browser, new check). (4) No regressions: full backend suite re-run (74/78 passing — the 4 failures are the same pre-existing, out-of-scope issues already flagged in iteration 19: a missing /tmp/item.jpg live-model fixture for 2 real-appraise tests, and accumulated disabled tscheck-shop-* residue from a much earlier iteration's test_tscheck_shop_crud_master_only.py skewing the hardcoded shops-count==14 assertions in test_tscheck_shops_seeded_data.py and test_tscheck_appraise_stage_regression.py). Re-ran regression-admin-and-finds-still-load and scan-progress-demo-four-steps browser checks — both still green. Cleaned up two of my own leftover tscheck-remove-with-items-* shop rows created during local payload debugging before the new hard-delete test file's category field was fixed; the pre-existing tscheck-shop-* residue predates this session and was left untouched per fixture discipline.",
+  "passed": 7,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Capture-studio hero appears on Home only — /scan is clean",
+      "name": "home-hero-only-not-on-scan",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844 master login on https://thrift-vision.preview.emergentagent.com: 'Capture studio' text, home-scan-hero-title='Point. Shoot. Appraise.', 'Good lighting'/'Fill the frame'/'Steady hands' hints, and 'Start capturing' CTA all visible inside home-scan-card. Clicking the card navigated to /scan. On /scan: scan-hero count=0, 'Point. Shoot. Appraise.' count=0, 'Capture studio' count=0, 'Step 01' count=1, appraise-button visible. No console errors, no >=400 /api/ responses."
+    },
+    {
+      "criterion": "Admin can hard-delete a shop that has no inventory references",
+      "name": "pytest tests/test_tscheck_shop_hard_delete.py::test_hard_delete_free_shop_succeeds_and_disable_default_still_works",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /shops {name:'tscheck-remove-free-<rand>', zone:1} -> 201. DELETE /shops/{id}?mode=remove -> 200 (deleted body returned); GET /shops?include_disabled=1 afterward does not contain the id. Separate POST tscheck-disable-free-<rand> + DELETE (no mode) -> 200 {disabled:true}, still present in include_disabled=1 listing. Cleaned up via mode=remove."
+    },
+    {
+      "criterion": "Admin cannot hard-delete a shop that still has inventory items pointing at it",
+      "name": "pytest tests/test_tscheck_shop_hard_delete.py::test_hard_delete_blocked_when_inventory_references_shop",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /shops tscheck-remove-with-items-<rand> -> 201. POST /inventory with appraisal.* fields and location=<that shop> -> 201. DELETE /shops/{id}?mode=remove -> 409 {detail:'1 item still reference this shop — reassign or disable instead'}. Default DELETE (no mode) still -> 200 {disabled:true}. Cleanup: DELETE /inventory/{item_id} -> 200, then DELETE /shops/{id}?mode=remove -> 200."
+    },
+    {
+      "criterion": "Admin UI exposes separate Disable and Delete controls, Delete requires confirmation",
+      "name": "admin-shop-dialog-disable-and-delete-controls",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844 master login, /admin: created tscheck-admin-ui-<ts> via the Add-shop dialog, opened its edit dialog via the row's pencil button. Both admin-shop-disable and admin-shop-delete visible. window.confirm stubbed to return false -> click on admin-shop-delete sent no DELETE request (dialog stayed open). Stubbed to true -> click fired DELETE /api/shops/{id}?mode=remove and the dialog closed. No console errors on rerun."
+    },
+    {
+      "criterion": "Non-master cannot delete shops in either mode",
+      "name": "pytest tests/test_tscheck_shop_hard_delete.py::test_nonmaster_cannot_delete_shop_either_mode and test_volunteer_cannot_delete_shop_either_mode",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Unauthenticated: DELETE /shops/does-not-matter -> 401/403, DELETE /shops/does-not-matter?mode=remove -> 401/403. Volunteer session (SarahTest/1234, via the pre-scaffolded volunteer_client fixture) was reachable and both DELETE variants returned 401/403 as well — not blocked."
+    },
+    {
+      "criterion": "No regressions: existing shop add/edit, inventory create/update, and the appraise flow still work",
+      "name": "full backend pytest suite + regression-admin-and-finds-still-load + scan-progress-demo-four-steps",
+      "lane": "backend+browser",
+      "status": "passed",
+      "evidence": "74/78 backend tests pass; the 4 failures are pre-existing/out-of-scope (2 need a live /tmp/item.jpg model fixture that isn't present in this env; 2 assert a hardcoded shops-count==14 against DB rows accumulated by a much earlier iteration's never-cleaned tscheck-shop-* residue — both already flagged in iteration 19, not introduced here). test_tscheck_shop_crud_master_only.py (duplicate-name 409, PATCH edits) and test_tscheck_inventory_create_zone_adjustment.py (Tooting -10%) both still pass individually. Browser: regression-admin-and-finds-still-load and scan-progress-demo-four-steps re-ran clean."
+    },
+    {
+      "criterion": "Shop deletion 404 guard (supporting coverage for the delete_shop endpoint)",
+      "name": "pytest tests/test_tscheck_shop_hard_delete.py::test_delete_shop_404_for_unknown_id",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "DELETE /shops/not-a-real-shop-id?mode=remove -> 404."
+    }
+  ],
+  "action_items": [
+    "Carried over from iteration 19 (not introduced by this session, not re-fixed per fixture discipline): /admin accumulates disabled tscheck-shop-* rows from a much earlier run of test_tscheck_shop_crud_master_only.py, which never hard-deletes its fixture. This skews the hardcoded shop-count==14 assertions in test_tscheck_shops_seeded_data.py and test_tscheck_appraise_stage_regression.py::test_regression_shops_endpoint_still_answers (currently counting 18-20 rows with include_disabled or active rows drifted). Recommend either loosening those two assertions to count only non-'tscheck-' named shops, or adding a mode=remove cleanup step to that older test's finally block.",
+    "Carried over from iteration 19: test_tscheck_appraise_robustness_and_gating.py::test_appraise_returns_200_three_times_in_a_row and test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal both require a /tmp/item.jpg fixture image that is not present in this environment, so they fail at fixture setup (not an app bug) rather than ever reaching the live-model call."
+  ],
+  "retest_needed": false
+}
