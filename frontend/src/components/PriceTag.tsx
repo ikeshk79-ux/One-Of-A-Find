@@ -208,14 +208,14 @@ export default function PriceTag({
         {!isTiny && <BrandLogo brand={item.brand} size={spec.logo} testid="tag-brand-logo" />}
         <div className="min-w-0 flex-1">
           <p
-            className="font-semibold uppercase tracking-widest"
+            className="truncate font-semibold uppercase tracking-widest"
             style={{ fontSize: spec.brandFs }}
             data-testid="tag-brand"
           >
             {item.brand}
           </p>
           <h2
-            className="leading-tight font-bold"
+            className="line-clamp-2 leading-tight font-bold"
             style={{ fontSize: spec.titleFs, marginTop: "0.5mm" }}
             data-testid="tag-title"
           >
@@ -225,7 +225,7 @@ export default function PriceTag({
       </div>
 
       <p
-        className="text-black/60"
+        className="truncate text-black/60"
         style={{ fontSize: spec.metaFs }}
         data-testid="tag-category"
       >
@@ -233,8 +233,11 @@ export default function PriceTag({
         {item.size ? ` · Size ${item.size}` : ""}
       </p>
 
-      <div className="flex items-end justify-between" style={{ marginTop: "auto" }}>
-        <div>
+      <div
+        className="flex items-end justify-between gap-1"
+        style={{ marginTop: "auto" }}
+      >
+        <div className="min-w-0 flex-1">
           <p
             className="uppercase tracking-widest text-black/60"
             style={{ fontSize: spec.metaFs }}
@@ -242,21 +245,23 @@ export default function PriceTag({
             Price
           </p>
           <p
-            className="font-bold tabular-nums"
+            className="truncate font-bold tabular-nums"
             style={{ fontSize: spec.priceFs, lineHeight: 1 }}
             data-testid="tag-price"
           >
             {gbp(item.recommended_price)}
           </p>
           <p
-            className="text-black/60"
+            className="truncate text-black/60"
             style={{ fontSize: spec.metaFs, marginTop: "0.5mm" }}
             data-testid="tag-condition"
           >
             {item.condition}
           </p>
         </div>
-        <canvas ref={qrRef} data-testid="tag-qr" />
+        {/* QR must never shrink — fixed footprint right of the price block. Price text truncates
+            with ellipsis instead of overlapping (observed on 4-digit prices like "£225.00" on A8). */}
+        <canvas ref={qrRef} className="shrink-0" data-testid="tag-qr" />
       </div>
 
       {!isTiny && (

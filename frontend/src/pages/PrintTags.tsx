@@ -219,16 +219,25 @@ export default function PrintTags() {
       )}
 
       {tiles.length > 0 && (
-        <div
-          className={`print-tags-grid ${meta.cls} mt-10`}
-          data-testid="print-tags-grid"
-          data-tag-size={size}
-          data-tag-cols={meta.cols}
-          style={{ gridTemplateColumns: `repeat(${meta.cols}, max-content)` }}
-        >
-          {tiles.map(({ item, key }) => (
-            <PriceTag key={key} item={item} size={size} showCutGuide={guides} />
-          ))}
+        <div className="no-print mt-6 text-[11px] text-muted-foreground">
+          Preview below (true physical size). The printed PDF renders exactly this layout — swipe
+          horizontally if the preview is wider than your screen.
+        </div>
+      )}
+
+      {tiles.length > 0 && (
+        <div className="mt-4 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div
+            className={`print-tags-grid ${meta.cls}`}
+            data-testid="print-tags-grid"
+            data-tag-size={size}
+            data-tag-cols={meta.cols}
+            style={{ gridTemplateColumns: `repeat(${meta.cols}, max-content)` }}
+          >
+            {tiles.map(({ item, key }) => (
+              <PriceTag key={key} item={item} size={size} showCutGuide={guides} />
+            ))}
+          </div>
         </div>
       )}
     </div>

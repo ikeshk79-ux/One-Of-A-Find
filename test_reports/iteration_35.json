@@ -1,0 +1,56 @@
+{
+  "iteration": 35,
+  "mode": "generate",
+  "task": "Verify /print-tags mobile layout fix (controls card full width + horizontally-scrollable true-mm preview grid + no QR/price overlap on long prices/titles) on 390x844 viewport.",
+  "summary": "All 6 acceptance criteria verified via browser checks against the public preview URL. The controls card now spans the viewport width (358px of 390px, heading left-edge at x=16), the A8 preview grid overflows horizontally inside its own `.overflow-x-auto` wrapper (grid scrollWidth 809px vs clientWidth 358px) without ever growing the document's own scrollWidth beyond the viewport (390==390 in both A8 and A6), and the long-price/long-title fixture (Burberry Gilet, £225.00) renders with no price/QR overlap (`overflow:hidden`+`text-overflow:ellipsis` on price, `-webkit-line-clamp:2` on title). The 'Open PDF for printing' button still fires the success toast with zero console errors.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Controls card uses full viewport width on mobile",
+      "name": "print-tags-controls-full-width-mobile",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844 after master login, navigated to /print-tags?ids=<2 seeded items>. controls box = {x:16,width:358,height:329.5} (>=320px, not stuck at <240px). 'TAG SHEET' heading boundingBox x=16 (<=24). document.documentElement scrollWidth(390)==clientWidth(390) -> no page-level horizontal scroll caused by the controls card."
+    },
+    {
+      "criterion": "Preview grid is horizontally scrollable, does not shrink the page",
+      "name": "print-tags-preview-grid-scrollable",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "A8 size, 2 items x copies=3 = 6 tiles, 4 cols. print-tags-grid element: scrollWidth=809 > clientWidth=358 (overflows internally). Direct parent is '.mt-4 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0' with overflowX:'auto', parentScrollWidth=825 > parentClientWidth=390. document.documentElement scrollWidth(390)==clientWidth(390) -> no viewport-level horizontal scrollbar."
+    },
+    {
+      "criterion": "No QR/price overlap on long prices",
+      "name": "print-tags-long-price-title-no-overlap",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Seeded tscheck item (Burberry Quilted House Check Gilet Liner, UK 8, recommended_price=225) via POST /api/inventory (201). At A8: tag-price boundingBox {x:24.5,width:11.4} right-edge 36.0 <= tag-qr boundingBox.x 40.0+1. Price text '£225.00'. Computed style overflow:hidden, textOverflow:ellipsis confirmed (truncate class)."
+    },
+    {
+      "criterion": "Long title clamps to 2 lines (no vertical overflow)",
+      "name": "print-tags-long-price-title-no-overlap",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same fixture/page load. tag-title computed style -webkit-line-clamp:2 (display:flow-root with webkit box clamp applied), boundingBox height 21.25px -- well under the 2-line + slack ceiling (30px) for A8's 8.5px font, confirming no 3rd-line expansion."
+    },
+    {
+      "criterion": "A6 preview also laid out cleanly (regression)",
+      "name": "print-tags-preview-grid-scrollable",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same check switched size select to A6 via print-size-select -> print-size-option-A6. print-tags-grid data-tag-cols='2'. document.documentElement scrollWidth(390)==clientWidth(390) after switch -> no page-level horizontal scroll regression."
+    },
+    {
+      "criterion": "Open PDF button still works end-to-end (regression)",
+      "name": "print-tags-open-pdf-button-works",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Clicked print-sheet-button on /print-tags?ids=<2 items>&size=A8; toast text containing 'PDF ready' became visible within 20s; zero console/page errors captured during the whole flow."
+    }
+  ],
+  "cleanup": "Deleted the 3 tscheck-* fixture inventory items via DELETE /api/inventory/{id} (all 204) at the end of the run. No activity/pricing_ledger rows required manual cleanup beyond the item delete cascade."
+}
