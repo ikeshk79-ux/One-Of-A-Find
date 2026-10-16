@@ -16,6 +16,7 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, ensure_indexes
 from lib.auth import seed_master
+from seed_shops import seed as seed_shops
 
 
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
@@ -23,6 +24,13 @@ from lib.auth import seed_master
 async def lifespan(app: FastAPI):
     app.state.index_task = asyncio.create_task(ensure_indexes())  # background: a big index build must not block boot
     await seed_master()  # ensure the master (admin) account exists
+    # Seed the Octavia Foundation shops on first boot so a fresh deployment (empty Mongo) has the
+    # branch list the frontend's location dropdowns rely on. The seeder is idempotent — on an
+    # existing database it only patches rows that have gone stale and otherwise no-ops.
+    try:
+        await seed_shops()
+    except Exception as e:  # noqa: BLE001 — never block boot on a seed hiccup
+        logging.getLogger(__name__).warning("shops seed skipped: %s", e)
     yield
     client.close()
 
