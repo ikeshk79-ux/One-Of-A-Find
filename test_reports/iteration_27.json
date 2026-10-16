@@ -1,0 +1,63 @@
+{
+  "iteration": 27,
+  "mode": "retest",
+  "summary": "Retest of the single bug from iteration_26: removed the nuclear print CSS rule `body > *:not(:has(.print-tags-grid[data-tag-size])) { visibility: hidden }` from index.css. Re-ran full backend suite (same 3 pre-existing out-of-scope failures, unrelated) then re-ran all 5 relevant print-media browser checks by name only (no script resend). The previously-failing 'print-media-legacy-tag-preview-unaffected' now PASSES: .print-sheet on /tag/{id} is visibility:'visible' and readable under print media emulation. All 4 regression checks (A8 16-up, A7 8-up, A6 4-up tiling, AppShell chrome hidden) still pass unchanged. Bug from iteration_26 is confirmed fixed.",
+  "passed": 6,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Backend regression baseline",
+      "name": "backend-full-suite",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 80 passed, 3 failed -- same pre-existing failures as iteration 19-26 (missing /tmp/item.jpg live-model fixture for 2 appraise tests; Chiswick High Road seed-flag residue giving 15 shops not 14). Unrelated to print-tags fix."
+    },
+    {
+      "criterion": "Legacy single-tag preview is unaffected on /tag/{id}",
+      "name": "print-media-legacy-tag-preview-unaffected",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check by name (no script resend): on /tag/{id} under print media emulation, .print-sheet now resolves computed visibility 'visible' (previously 'hidden' in iteration_26). Confirms the nuclear `body > *:not(:has(...))` rule removal fixed the regression. Screenshot: print-media-legacy-tag-preview-unaffected-legacy-tag-print-media.png"
+    },
+    {
+      "criterion": "A8 print layout tiles 16 per A4 (regression)",
+      "name": "print-media-a8-tiles-16-per-sheet",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check by name. Unchanged pass: grid width ~210mm, 4 columns ~52mm each, 16 .price-tag children ~52x74mm, row-wrap confirmed."
+    },
+    {
+      "criterion": "A7 and A6 print layouts still tile correctly (regression) - A7",
+      "name": "print-media-a7-tiles-8-per-sheet",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check by name. Unchanged pass: grid width ~210mm, 2 columns ~74mm each, 8 tiles ~74x105mm."
+    },
+    {
+      "criterion": "A7 and A6 print layouts still tile correctly (regression) - A6",
+      "name": "print-media-a6-tiles-4-per-sheet",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check by name. Unchanged pass: grid width ~210mm, 2 columns ~105mm each, 4 tiles ~105x148mm."
+    },
+    {
+      "criterion": "AppShell chrome still hidden in print media (regression)",
+      "name": "print-media-appshell-chrome-hidden",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check by name. Unchanged pass: print-size-select/print-copies-input/print-guides-toggle hidden (visibility:hidden/offsetParent null); [data-testid=app-main] padding/margin 0px, maxWidth none; print-tags-grid remains visible."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "pre_existing_out_of_scope_failures",
+      "severity": "low",
+      "detail": "Backend: same 3 pre-existing failures carried since iteration 19+ (missing /tmp/item.jpg live-model fixture for 2 appraise tests; Chiswick High Road needs_zone_review seed-flag residue giving 15 shops instead of 14). Unrelated to print-tags feature."
+    }
+  ],
+  "retest_needed": false
+}

@@ -373,10 +373,23 @@
 }
 
 @media print {
-  body { background: #fff !important; color: #000 !important; }
+  /* -- Reset everything the shell layers on top of the page --
+     The volunteer prints from inside AppShell → <main> which adds max-width, padding, and a
+     scrollable viewport. Carry none of that into the PDF: strip all margins/padding/overflow
+     off html/body/main so the only thing the browser lays out is the tag grid. Also hide
+     every other element so headers, nav, toasts and the backdrop glow can't claim pixels. */
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; width: 210mm !important; }
+  body { overflow: visible !important; }
+  [data-testid="app-main"] { max-width: none !important; padding: 0 !important; margin: 0 !important; }
   .no-print { display: none !important; }
   .glow-radial { display: none !important; }
   .print-sheet { box-shadow: none !important; }
+  /* AppShell's <header> and <BottomNavigation> both carry the .no-print class already, so we
+     don't need a nuclear "hide everything that isn't the grid" selector — that one hid the
+     legacy single-tag preview on /tag/{id} too, since that route never renders a
+     `.print-tags-grid[data-tag-size]`. Keep the chrome-hiding limited to .no-print and let the
+     page's actual printable content (grid or single tag) print cleanly. */
+
   /* Legacy single-tag preview (TagPage) keeps a 2-col fallback. */
   .print-tags-grid {
     display: grid !important;
@@ -384,30 +397,37 @@
     gap: 10mm 8mm !important;
     margin-top: 0 !important;
   }
-  /* Sized sheets: tile exactly into A4 with zero gap/margin so N tags fit per A4 as advertised.
-     The grid-template-columns is set inline per size on the element, so repeat(cols, max-content)
-     is already correct — we only need to zero out the gaps and margins the on-screen view adds. */
+
+  /* Sized sheets: tile exactly to A4 with zero gap/margin so N tags fit per sheet as advertised.
+     Pin the grid at the paper width (210mm) and reset the inline grid-template-columns the
+     component writes for the on-screen preview — print always uses the known col count per
+     size so viewport scaling can't change the layout. Each child cell is sized in mm so the
+     browser's print engine lays it out at true physical size. */
   .print-tags-grid[data-tag-size] {
+    width: 210mm !important;
     gap: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     justify-content: start !important;
-  }
-  .print-tags-grid > * { break-inside: avoid; page-break-inside: avoid; }
-  /* Default page: on-screen single tag preview keeps a 12mm safety margin so the browser's
-     scaling-to-fit doesn't nip at the edges. Sized sheets override this below. */
-  @page { size: A4; margin: 12mm; }
-  /* Zero-margin page so a 16-up A8 sheet (4 cols × 52mm = 208mm, 4 rows × 74mm = 296mm) uses the
-     full A4 physical area and the tiles land exactly on the paper. The user chooses "no margins"
-     in the browser print dialog; the @page rule declares our intent. */
-  body:has(.print-tags-grid[data-tag-size]) { }
-  .print-tags-grid[data-tag-size="A6"],
-  .print-tags-grid[data-tag-size="A7"],
-  .print-tags-grid[data-tag-size="A8"] {
     page-break-after: auto;
   }
-  /* Firefox/Chromium ignore `@page` rules that depend on the subtree, so we rely on inline
-     `width` in mm on the tag and let the browser's "no margins" setting handle A4 edges. */
+  .print-tags-grid[data-tag-size="A6"] { grid-template-columns: repeat(2, 105mm) !important; }
+  .print-tags-grid[data-tag-size="A7"] { grid-template-columns: repeat(2, 74mm)  !important; }
+  .print-tags-grid[data-tag-size="A8"] { grid-template-columns: repeat(4, 52mm)  !important; }
+  .print-tags-grid[data-tag-size] > * { break-inside: avoid; page-break-inside: avoid; }
+  /* The on-screen preview sets a hairline border on each tag so volunteers can see tile edges;
+     in print the border adds visible lines between tiles which users don't want unless they
+     turned on cutting guides. Suppress the default hairline but keep an explicit border when
+     the admin has toggled guides on (set inline via `0.4mm dashed`). */
+  .print-tags-grid[data-tag-size] > .print-sheet { border-color: transparent !important; }
+  .print-tags-grid[data-tag-size] > .print-sheet[style*="dashed"] { border-color: #000 !important; }
+
+  /* Zero-margin A4 so the 16-up A8 sheet (4×52=208mm wide, 4×74=296mm tall) uses the full page.
+     The user still has to pick "No margins" / "Default" (not "Minimum") in the browser print
+     dialog — Chrome/Safari always respect @page size but mobile browsers sometimes enforce a
+     tiny physical minimum they can't disable. The declared margin: 0 is what makes the PDF
+     intent match the on-screen grid. */
+  @page { size: A4; margin: 0; }
 }
 
 /* On-screen preview for sized sheets: show the tiles at true mm scale with a subtle gap so the

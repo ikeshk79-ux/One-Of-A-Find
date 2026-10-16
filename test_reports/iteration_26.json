@@ -1,0 +1,82 @@
+{
+  "iteration": 26,
+  "mode": "generate",
+  "summary": "New briefing: verify the Print Tags page (/print-tags) correctly tiles A4 sheets under real print-media emulation on a mobile (390x844) viewport -- the fix pins the grid to 210mm with explicit per-size grid-template-columns and hides AppShell chrome via @media print. Wrote 6 new named browser checks using page.emulateMedia({media:'print'}) + getBoundingClientRect()/getComputedStyle() measurements (mm->px at 96 DPI) plus page.pdf() snapshots, covering all 6 acceptance_matrix criteria. 5 of 6 passed cleanly confirming the fix works as described (A8 16-up, A7 8-up, A6 4-up tiling at true mm sizes with correct 210mm grid width and column counts; AppShell chrome/controls hidden and <main> padding/margin/max-width reset in print media; cutting-guides border toggle correctly transparent-by-default / black-dashed-when-on). One REAL BUG found and confirmed on rerun (not flaky): the global print CSS rule `body > *:not(:has(.print-tags-grid[data-tag-size])) { visibility: hidden }` hides the ENTIRE page content on /tag/{id} (legacy single-tag preview) when print media is emulated, because that route never renders a `.print-tags-grid[data-tag-size]` element -- so the single PriceTag becomes invisible/unreadable in print media, contradicting acceptance criterion 6 which requires it to remain visible and readable. Backend regression suite re-run: same 3 pre-existing out-of-scope failures (appraise live-model fixture image missing, Chiswick seed-flag residue giving 15 shops not 14) -- unrelated to this feature, unchanged from iteration 25.",
+  "passed": 6,
+  "failed": 1,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Backend regression baseline (no API-bearing criterion in this briefing beyond general health)",
+      "name": "backend-full-suite",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 80 passed, 3 failed -- identical pre-existing failures documented since iteration 19+ (test_appraise_with_real_image_returns_valid_appraisal + test_appraise_returns_200_three_times_in_a_row: missing /tmp/item.jpg fixture; test_shops_seeded_with_14_known_branches: 15 shops not 14, Chiswick seed-flag residue). None relate to print-tags."
+    },
+    {
+      "criterion": "A8 print layout tiles 16 per A4",
+      "name": "print-media-a8-tiles-16-per-sheet",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Seeded 16 tscheck-print-a8-* items via POST /api/inventory, opened /print-tags?size=A8 on 390x844 viewport, emulateMedia('print'). grid.boundingBox().width/3.7795 = ~210mm (within 2mm); getComputedStyle gridTemplateColumns resolved to 4 values each ~52mm; 16 .price-tag children present with boundingBox ~52mm x ~74mm; row-wrap confirmed (tile[0].y==tile[3].y, tile[4].y>tile[0].y). page.pdf() snapshot saved to /tmp/a8-print-check.pdf. Cleaned up seeded items via DELETE."
+    },
+    {
+      "criterion": "A7 print layout tiles 8 per A4",
+      "name": "print-media-a7-tiles-8-per-sheet",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Seeded 8 tscheck-print-a7-* items, /print-tags?size=A7, print media: grid width ~210mm, 2 columns ~74mm each, 8 tiles each ~74x105mm (within 1.5mm). PDF snapshot /tmp/a7-print-check.pdf. Cleaned up."
+    },
+    {
+      "criterion": "A6 print layout tiles 4 per A4",
+      "name": "print-media-a6-tiles-4-per-sheet",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Seeded 4 tscheck-print-a6-* items, /print-tags?size=A6, print media: grid width ~210mm, 2 columns ~105mm each, 4 tiles each ~105x148mm. PDF snapshot /tmp/a6-print-check.pdf. Cleaned up."
+    },
+    {
+      "criterion": "AppShell chrome is hidden in print media",
+      "name": "print-media-appshell-chrome-hidden",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "In print media on /print-tags: print-size-select, print-copies-input, print-guides-toggle all computed visibility:hidden/offsetParent null; [data-testid=app-main] computed padding/margin resolve to '0px' and maxWidth 'none'; print-tags-grid itself remains visibility:'visible'. Cleaned up fixture item."
+    },
+    {
+      "criterion": "Default A8 tag has no visible border",
+      "name": "print-media-tag-border-guides-toggle",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "guides=0: computed borderColor on .print-sheet = 'rgba(0, 0, 0, 0)' in print media (the inline hairline #e5e5e5 border is correctly overridden to transparent by the print stylesheet). guides=1: borderStyle='dashed', borderColor='rgb(0, 0, 0)'. Cleaned up fixture item."
+    },
+    {
+      "criterion": "Legacy single-tag preview is unaffected on /tag/{id}",
+      "name": "print-media-legacy-tag-preview-unaffected",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "On /tag/{id} with print media emulated: element keeps data-tag-size absent and w-[340px] class as expected, BUT computed visibility is 'hidden' (expected 'visible'). Root cause: index.css print block rule `body > *:not(:has(.print-tags-grid[data-tag-size])) { visibility: hidden; }` (line 390) hides every ancestor branch of the DOM that does not contain a `.print-tags-grid[data-tag-size]` element -- /tag/{id} never renders that element, so the entire page (including the single PriceTag) is hidden in print media. Reproduced identically on rerun (not flaky) -- confirmed via run_browser_script 'print-media-legacy-tag-preview-unaffected' twice, same assertion failure both times, screenshot attached."
+    }
+  ],
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "Legacy single-tag preview is unaffected on /tag/{id}",
+      "description": "The print-media CSS added to fix the bulk print-tags grid also breaks printing a single item's tag from /tag/{id}: the selector `body > *:not(:has(.print-tags-grid[data-tag-size])) { visibility: hidden; }` in index.css (~line 390) hides the entire page when no `.print-tags-grid[data-tag-size]` element exists in the DOM. /tag/{id} renders a single unsized PriceTag (no data-tag-size, by design -- it's the legacy fixed-340px preview) so this selector hides it along with everything else, leaving a blank printed page. Fix direction: scope the hide-everything-except-the-grid rule to pages/branches that actually contain `.print-tags-grid[data-tag-size]`, e.g. guard it with a wrapper class only present on PrintTags.tsx, or union the selector with `:has(.print-sheet)` so any printable tag (grid-based or legacy single) stays visible.",
+      "evidence": "Browser check print-media-legacy-tag-preview-unaffected: computed visibility 'hidden' on the .print-sheet element, expected 'visible'; reproduced on rerun. Failure screenshot captured. No backend involvement -- this is a pure CSS/frontend defect, cross-checked by the fact that the same markup renders visibility:'visible' when media is 'screen' (pre-emulation assertion `await expect(tag).toBeVisible()` on line above passed)."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "frontend_bug_fix_needed",
+      "severity": "medium",
+      "detail": "Scope the print.css 'hide everything except the print-tags-grid' rule so it doesn't blank out /tag/{id}'s legacy single-tag print preview. See bugs[0] for fix direction."
+    },
+    {
+      "type": "pre_existing_out_of_scope_failures",
+      "severity": "low",
+      "detail": "Backend: same 3 pre-existing failures carried since iteration 19+ (missing /tmp/item.jpg live-model fixture for 2 appraise tests; Chiswick High Road needs_zone_review seed-flag residue giving 15 shops instead of 14). Unrelated to print-tags feature."
+    }
+  ],
+  "retest_needed": true
+}
