@@ -17,6 +17,7 @@
 import jsPDF from "jspdf";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { brandLogoUrl } from "@/lib/brandDomain";
 import type { InventoryItem } from "@/lib/types";
 import { gbp } from "@/lib/types";
 
@@ -41,9 +42,63 @@ type PdfSpec = {
 
 const SPECS: Record<PdfTagSize, PdfSpec> = {
   A6: { w: 105, h: 148, cols: 2, rows: 2, padding: 5, titleFs: 12, brandFs: 8, priceFs: 28, metaFs: 7, qr: 24, barcodeH: 14, barcodeW: 70 },
-  A7: { w: 74,  h: 105, cols: 2, rows: 4, padding: 3, titleFs: 9,  brandFs: 7, priceFs: 20, metaFs: 6, qr: 18, barcodeH: 10, barcodeW: 50 },
+  // A7 fits 2 cols × 2 rows (148×210mm) comfortably inside A4 — the ISO fold math (8×A7 per A4)
+  // only works when you cut the sheet, which isn't what we do here. 4-up printed uncut is the
+  // practical layout; the vertical slack centres the grid on the page.
+  A7: { w: 74,  h: 105, cols: 2, rows: 2, padding: 3, titleFs: 9,  brandFs: 7, priceFs: 20, metaFs: 6, qr: 18, barcodeH: 10, barcodeW: 50 },
   A8: { w: 52,  h: 74,  cols: 4, rows: 4, padding: 2, titleFs: 7,  brandFs: 5.5, priceFs: 15, metaFs: 5, qr: 12, barcodeH: 7,  barcodeW: 36 },
 };
+
+/** Brand-logo size (mm square) per tag size. A8 drops the logo entirely — there isn't enough
+ * width for it alongside the condition text and the barcode would start to collide. */
+const LOGO_MM: Record<PdfTagSize, number> = { A6: 10, A7: 7, A8: 5 };
+
+/** Fetch unavatar.io's logo PNG for a brand, data-url it so it can be embedded. Null when the
+ * brand has no logo, is on the "unbranded" allowlist, the service returns a 404/CORS error, or
+ * the image fails to decode. The result is memoised for the lifetime of the page so a 16-tile
+ * A8 sheet makes at most one network request per brand.
+ *
+ * unavatar.io occasionally returns a Windows .ico body with a mislabelled `content-type: image/png`
+ * header (observed in production for well-known brands). jsPDF.addImage(…, "PNG", …) throws on a
+ * bad PNG signature, which would otherwise kill the entire print job. We validate the PNG magic
+ * number (89 50 4E 47 0D 0A 1A 0A) up front and treat anything else as "no logo". */
+const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const LOGO_CACHE = new Map<string, string | null>();
+async function fetchBrandLogo(brand: string): Promise<string | null> {
+  const url = brandLogoUrl(brand);
+  if (!url) return null;
+  if (LOGO_CACHE.has(url)) return LOGO_CACHE.get(url) ?? null;
+  try {
+    // unavatar.io returns a 404 (as HTML) when `?fallback=false` and no logo exists — bail then
+    // so we don't embed garbage. The service does send permissive CORS headers so fetch works.
+    const res = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) {
+      LOGO_CACHE.set(url, null);
+      return null;
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    // Reject anything that isn't a real PNG. ICO files (00 00 01 00…), SVGs (<?xml / <svg), and
+    // HTML error pages all fail this check and silently skip the logo.
+    const isPng =
+      buf.length >= 8 && PNG_MAGIC.every((b, i) => buf[i] === b);
+    if (!isPng) {
+      LOGO_CACHE.set(url, null);
+      return null;
+    }
+    const blob = new Blob([buf], { type: "image/png" });
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+    LOGO_CACHE.set(url, dataUrl);
+    return dataUrl;
+  } catch {
+    LOGO_CACHE.set(url, null);
+    return null;
+  }
+}
 
 /** A4 is 210×297mm. Both tilings fit without any sheet margin (A8: 4×52=208, 4×74=296). */
 const PAGE_W = 210;
@@ -116,6 +171,7 @@ function fitText(pdf: jsPDF, text: string, maxMm: number): string {
 async function drawTag(
   pdf: jsPDF,
   item: InventoryItem,
+  size: PdfTagSize,
   spec: PdfSpec,
   x: number,
   y: number,
@@ -147,12 +203,36 @@ async function drawTag(
   pdf.line(inner.x, bandBottom, inner.x + inner.w, bandBottom);
   pdf.setDrawColor(0);
 
-  // ─── Brand (small caps) + title (bold) ────────────────────────────────────
+  // ─── Brand logo + brand name + title ──────────────────────────────────────
+  // Fetch the logo first so the row below can shift text right by its width. If the brand has
+  // no logo (unbranded / 404), logoDataUrl is null and the text simply fills the full row.
+  const logoDataUrl = await fetchBrandLogo(item.brand ?? "");
+  const logoMm = LOGO_MM[size];
+  const hasLogo = Boolean(logoDataUrl);
+  const brandTextX = hasLogo ? inner.x + logoMm + 1.5 : inner.x;
+  const brandTextW = inner.w - (hasLogo ? logoMm + 1.5 : 0);
+
   let cursor = bandBottom + padding * 0.5 + brandFs * 0.35;
+  let logoDrawn = false;
+  if (hasLogo && logoDataUrl) {
+    // Place the logo so its top aligns with the brand-name baseline-ish row. jsPDF addImage uses
+    // top-left origin so (brandTextX offset left, cursor-ish y) — nudge up by 0.3mm so it sits
+    // visually balanced with the uppercase brand text.
+    try {
+      pdf.addImage(logoDataUrl, "PNG", inner.x, cursor - brandFs * 0.3, logoMm, logoMm);
+      logoDrawn = true;
+    } catch {
+      // A corrupt PNG the magic-number check didn't catch (e.g. truncated download) must not
+      // kill the whole print job — silently fall back to text-only for this tile.
+      logoDrawn = false;
+    }
+  }
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(brandFs);
-  pdf.text(fitText(pdf, (item.brand ?? "").toUpperCase(), inner.w), inner.x, cursor);
-  cursor += titleFs * 0.5;
+  const brandDrawX = logoDrawn ? brandTextX : inner.x;
+  const brandDrawW = logoDrawn ? brandTextW : inner.w;
+  pdf.text(fitText(pdf, (item.brand ?? "").toUpperCase(), brandDrawW), brandDrawX, cursor);
+  cursor += Math.max(titleFs * 0.5, logoDrawn ? logoMm - brandFs * 0.3 + 0.5 : titleFs * 0.5);
   pdf.setFontSize(titleFs);
   pdf.text(fitText(pdf, item.title ?? "", inner.w), inner.x, cursor);
 
@@ -254,7 +334,7 @@ export async function generateTagsPdf({
     // Awaiting inside the loop keeps QR/barcode generation sequential; the volunteer waits a
     // second or two for 16 tiles — not worth the complexity of a parallel Promise.all here.
     // eslint-disable-next-line no-await-in-loop
-    await drawTag(pdf, tiles[i], spec, x, y, showCutGuide);
+    await drawTag(pdf, tiles[i], size, spec, x, y, showCutGuide);
   }
 
   const blob = pdf.output("blob");

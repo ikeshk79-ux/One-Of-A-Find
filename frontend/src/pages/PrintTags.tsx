@@ -24,7 +24,7 @@ import type { InventoryItem } from "@/lib/types";
  * copies-per-tag cap so the Print button can't ask for more tiles than one sheet holds. */
 const SIZE_META: Record<TagSize, { label: string; perSheet: number; cols: number; cls: string }> = {
   A6: { label: "A6 — 4 per A4 sheet", perSheet: 4, cols: 2, cls: "tag-sheet-a6" },
-  A7: { label: "A7 — 8 per A4 sheet", perSheet: 8, cols: 2, cls: "tag-sheet-a7" },
+  A7: { label: "A7 — 4 per A4 sheet", perSheet: 4, cols: 2, cls: "tag-sheet-a7" },
   A8: { label: "A8 — 16 per A4 sheet (default)", perSheet: 16, cols: 4, cls: "tag-sheet-a8" },
 };
 

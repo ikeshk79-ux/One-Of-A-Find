@@ -1,0 +1,73 @@
+{
+  "iteration": 30,
+  "mode": "retest",
+  "task": "Retest after fixing: (1) SPECS.A7 rows 4->2 so all A7 tiles stay on-page, (2) fetchBrandLogo PNG magic-number validation to reject mislabelled ICO/HTML bodies served with content-type: image/png. Verified all iteration_29 criteria plus a dedicated A7 on-page geometry check and the new ICO-rejection check.",
+  "passed": 7,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing backend failures (out of scope, unchanged from iteration_29): test_tscheck_appraise_robustness_and_gating / test_tscheck_appraise_endpoint fail because the /tmp/item.jpg fixture image is missing from this environment; test_tscheck_shops_seeded_data expects Chiswick High Road needs_zone_review=True but got False (seed-flag residue from prior iterations)."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "A8 PDF with a known-brand item embeds a logo image per tile",
+      "name": "pdf-logo-embeds-nike-a8",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran unchanged. 16 fresh tscheck-pdflogo-a8-* Nike items, mocked red PNG via unavatar.io intercept. All 16 tiles sampled 96% (24/25) red in the computed 5mm logo box. numPages=1."
+    },
+    {
+      "criterion": "A6 PDF logo size matches spec (10mm)",
+      "name": "pdf-logo-size-a6-10mm",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran unchanged. 4 fresh tscheck-pdflogo-a6-* Nike items. All 4 tiles sampled 90.6% (58/64) red in the 10mm logo box. numPages=1."
+    },
+    {
+      "criterion": "A7 PDF logo size matches spec (7mm) AND all 4 tiles land inside A4",
+      "name": "pdf-logo-size-a7-7mm",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Updated check to reflect fixed geometry: SPECS.A7 now cols=2,rows=2, originY=(297-2*105)/2=43.5mm. 4 fresh tscheck-pdflogo-a7-* Nike items at A7. Script now asserts every one of the 4 computed tiles satisfies 0<=y and y+h<=297 (throws if any tile is off-page) instead of silently skipping off-page rows as iteration_29 did. All 4 tiles landed on-page and each sampled 100% (49/49) red in the 7mm logo box. numPages=1. This confirms the iteration_29 bug (rows 0 & 3 vanishing off A4) is fixed."
+    },
+    {
+      "criterion": "Unbranded item renders without a logo and without errors (regression)",
+      "name": "pdf-unbranded-renders-text-only-no-logo",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran unchanged. 2 fresh tscheck-pdflogo-unbranded-* items, unavatarHits=0 (brandDomain returns null for Unbranded), 0% mock-colour pixels in logo region, tile ink pixels present (327/343) confirming text still renders. No console errors."
+    },
+    {
+      "criterion": "unavatar.io 404 gracefully falls back (regression)",
+      "name": "pdf-logo-404-fallback-then-success-after-reload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran unchanged. Phase1 (404 intercept): both tiles 0% mock colour, no app-level JS errors (only a benign network 404 console log), numPages=1. Phase2 (reload + valid PNG): both tiles 97.9% red, confirming cache didn't permanently poison the brand key."
+    },
+    {
+      "criterion": "unavatar.io 200-with-ICO body is rejected (not just 404)",
+      "name": "pdf-logo-ico-magic-rejected",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "New check: intercepted unavatar.io/* with status 200, content-type: image/png, but a body starting 00 00 01 00 (ICO magic, not PNG magic 89 50 4E 47). 2 fresh tscheck-pdflogo-icomagic-* Nike items at A8. PDF generated successfully (numPages=1), 'PDF ready' toast fired, 'Could not generate PDF' toast never appeared (count 0), no window error-event fired (appErrors=[]). Sampled the 5mm logo box on both tiles: 96.3% and 97.5% white pixels, confirming the PNG-magic validation in fetchBrandLogo rejected the mislabelled ICO body and the tile rendered text-only instead of crashing the whole sheet."
+    },
+    {
+      "criterion": "Button + toast flow regression",
+      "name": "print-sheet-button-generating-state-and-toast",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran unchanged. sawGenerating=true, genCalls=1, openCalls=1, success toast appeared, button returned to 'Open PDF for printing', grid stayed visible throughout."
+    },
+    {
+      "criterion": "Backend suite regression (unrelated pre-existing failures tracked, not re-caused by this fix)",
+      "name": "pytest backend/tests",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 80 passed, 3 failed (all pre-existing and unrelated to the logo/A7 fix per iteration_29 and this briefing's spec_deviations: missing /tmp/item.jpg fixture for 2 appraise tests, and a Chiswick needs_zone_review seed-flag residue). No new failures introduced."
+    }
+  ]
+}
