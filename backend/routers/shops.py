@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from lib.auth import require_master, require_session
+from lib.activity import log_activity
 from lib.db import db
 from lib.pricing import apply_adjustment, load_rules
 from models.shop import (
@@ -95,7 +96,7 @@ async def delete_shop(
     shop_id: str,
     mode: str = Query(default="disable"),
     reassign_to: str | None = Query(default=None),
-    _: dict = Depends(require_master),
+    session: dict = Depends(require_master),
 ):
     """Delete a shop. Defaults to a soft-disable so existing inventory items that reference
     this shop by name continue to render. Pass `?mode=remove` to hard-delete; the request is
@@ -119,7 +120,7 @@ async def delete_shop(
             target = await db.shops.find_one({"id": reassign_to})
             if not target:
                 raise HTTPException(status_code=404, detail="Target shop not found")
-            await db.inventory.update_many(
+            inv_moved = await db.inventory.update_many(
                 {"location": doc["name"]}, {"$set": {"location": target["name"]}}
             )
             await db.pricing_ledger.update_many(
@@ -131,6 +132,22 @@ async def delete_shop(
                 {"$set": {"shop_name": target["name"]}},
             )
             await db.shops.delete_one({"id": shop_id})
+            # Destructive master action: leave an audit trail so a crash mid-sequence can be
+            # investigated afterwards and the actor is known. The reassignment is three separate
+            # update_many calls (no cross-collection transaction), so a mid-sequence failure
+            # leaves partial state — accepted knowingly for simplicity; the audit entry records
+            # the intent for root-cause.
+            await log_activity(
+                session.get("username"),
+                "shop_merged",
+                details={
+                    "shop_id": shop_id,
+                    "shop_name": doc["name"],
+                    "target_shop_id": target["id"],
+                    "target_shop_name": target["name"],
+                    "items_reassigned": inv_moved.modified_count,
+                },
+            )
             return Shop(**_aware(doc))
 
         linked = await db.inventory.count_documents({"location": doc["name"]})
@@ -140,6 +157,11 @@ async def delete_shop(
                 detail=f"{linked} item{'s' if linked != 1 else ''} still reference this shop — merge into another branch, reassign them, or disable this shop instead",
             )
         await db.shops.delete_one({"id": shop_id})
+        await log_activity(
+            session.get("username"),
+            "shop_deleted",
+            details={"shop_id": shop_id, "shop_name": doc["name"]},
+        )
         return Shop(**_aware(doc))
 
     # Default: soft-disable (back-compat with the previous DELETE contract).
@@ -147,6 +169,11 @@ async def delete_shop(
         {"id": shop_id},
         {"$set": {"disabled": True, "updated_at": datetime.now(timezone.utc)}},
         return_document=True,
+    )
+    await log_activity(
+        session.get("username"),
+        "shop_disabled",
+        details={"shop_id": shop_id, "shop_name": doc["name"]},
     )
     return Shop(**_aware(updated))
 

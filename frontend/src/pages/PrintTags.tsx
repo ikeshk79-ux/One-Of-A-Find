@@ -19,9 +19,10 @@ import { apiGet } from "@/lib/api";
 import { generateTagsPdf } from "@/lib/pdfTags";
 import type { InventoryItem } from "@/lib/types";
 
-/** Per-size layout metadata. The grid tiles exactly into A4 (zero-margin page) so there's no
- * paper waste: A6=2×2 (4/sheet), A7=2×4 (8/sheet), A8=4×4 (16/sheet). Also carries the max
- * copies-per-tag cap so the Print button can't ask for more tiles than one sheet holds. */
+/** Per-size layout metadata. The grid tiles into A4 at zero-margin: A6=2×2 (4/sheet),
+ * A7=2×2 (4/sheet — the ISO fold math says 8/sheet, but that only works when you cut A4, so
+ * printed uncut it tiles as 4), A8=4×4 (16/sheet). Also carries the max copies-per-tag cap so
+ * the Print button can't ask for more tiles than one sheet holds. */
 const SIZE_META: Record<TagSize, { label: string; perSheet: number; cols: number; cls: string }> = {
   A6: { label: "A6 — 4 per A4 sheet", perSheet: 4, cols: 2, cls: "tag-sheet-a6" },
   A7: { label: "A7 — 4 per A4 sheet", perSheet: 4, cols: 2, cls: "tag-sheet-a7" },
@@ -86,7 +87,7 @@ export default function PrintTags() {
       });
       toast.success("PDF ready — open in your PDF viewer to print");
     } catch (err) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       toast.error("Could not generate PDF");
     } finally {
       setGenerating(false);

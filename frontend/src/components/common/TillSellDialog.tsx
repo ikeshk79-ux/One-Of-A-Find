@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { apiGet, apiPatch } from "@/lib/api";
+import { apiGet, apiPatch, ApiError } from "@/lib/api";
 import { gbp } from "@/lib/types";
 import type { InventoryItem } from "@/lib/types";
 
@@ -55,7 +55,22 @@ export default function TillSellDialog({
       void qc.invalidateQueries({ queryKey: ["activity"] });
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message || "Could not mark sold"),
+    onError: (e: Error) => {
+      // Surface the backend detail (e.g. "Item is already marked sold" after a cross-device
+      // race) so volunteers see the real reason, not just the generic fetch wrapper message.
+      const detail =
+        e instanceof ApiError
+          ? typeof (e.body as { detail?: unknown } | null)?.detail === "string"
+            ? ((e.body as { detail: string }).detail)
+            : e.message
+          : e.message;
+      toast.error(detail || "Could not mark sold");
+      // On a 409 the server-side state has diverged from our cache — refetch so the dialog
+      // flips to the "already sold" branch next time it opens.
+      if (e instanceof ApiError && e.status === 409) {
+        void qc.invalidateQueries({ queryKey: ["inventory"] });
+      }
+    },
   });
 
   const i = item.data;

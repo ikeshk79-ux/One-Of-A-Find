@@ -1,0 +1,87 @@
+{
+  "iteration": 32,
+  "mode": "retest",
+  "task": "Verify the code-review fixes: (1) inventory.py mark_sold rejects a replayed sell with 409 'Item is already marked sold' and preserves sold_price/sold_at; (2) TillSellDialog surfaces the backend detail string and invalidates ['inventory'] on 409; (3) shops.py writes shop_merged/shop_deleted/shop_disabled activity_log entries; (4) db.py ensure_indexes covers pricing_ledger(item_id,created_at desc), pricing_rules(version desc), shops(id unique).",
+  "passed": 10,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing backend failures (out of scope, unchanged from prior iterations): test_tscheck_appraise_robustness_and_gating / test_tscheck_appraise_endpoint fail because the /tmp/item.jpg fixture image is missing from this environment; test_tscheck_shops_seeded_data expects Chiswick High Road needs_zone_review=True but got False (seed-flag residue from prior iterations)."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Replayed sell is rejected (idempotency guard) + sold item can still return to floor",
+      "name": "test_tscheck_sell_idempotency.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "New file, 2 tests. PATCH /inventory/{id}/sell {sold:true, sold_price:5.00} -> 200 status=sold sold_price=5.00. Replay PATCH {sold:true, sold_price:99.99} -> 409 detail=='Item is already marked sold'. GET afterwards: sold_price still 5.00, sold_at unchanged from the canonical stored value. Second test: sold->available (200, sold_price/sold_at null) then available->sold again succeeds 200 (guard is one-way). 2 passed."
+    },
+    {
+      "criterion": "Till Mode UI surfaces the 409 reason on a cross-device race",
+      "name": "till-race-409-shows-backend-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "New check. Master opens till dialog for a fresh tscheck-till-race-* item while available (till-confirm-sell visible), then a parallel API call marks it sold (simulating the second device). Clicking 'Mark sold' on the stale dialog fires the mutation, gets 409, and the toast shows the literal text 'Item is already marked sold' (asserted present; 'request failed with 409' and 'could not mark sold' asserted absent). Reopening the till dialog for the same SKU afterwards shows the 'till-already-sold' branch, confirming the ['inventory'] query was invalidated on 409. Ran locally and re-ran once more through the public preview URL (https://thrift-vision.preview.emergentagent.com) — both passed. One benign console 409 network log (expected, the race itself)."
+    },
+    {
+      "criterion": "Shop merge writes an activity log entry (shop_merged, target name + items_reassigned)",
+      "name": "test_tscheck_shop_activity_log.py::test_shop_merge_writes_shop_merged_activity_entry",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Created tscheck dup/target shops + 1 linked item, DELETE /shops/{dup}?mode=remove&reassign_to={target} -> 200. GET /api/activity (master) found an action=='shop_merged' entry with details.target_shop_name==target_name, details.items_reassigned>=1, username=='master'."
+    },
+    {
+      "criterion": "Shop hard-delete (empty shop) writes an activity log entry (shop_deleted)",
+      "name": "test_tscheck_shop_activity_log.py::test_shop_hard_delete_writes_shop_deleted_activity_entry",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Created an empty tscheck shop, DELETE /shops/{id}?mode=remove -> 200. GET /api/activity found action=='shop_deleted' with details.shop_name matching, username=='master'."
+    },
+    {
+      "criterion": "Shop disable (soft) writes an activity log entry (shop_disabled)",
+      "name": "test_tscheck_shop_activity_log.py::test_shop_soft_disable_writes_shop_disabled_activity_entry",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Created a tscheck shop, DELETE /shops/{id} (default mode) -> 200 and disabled:true in response. GET /api/activity found action=='shop_disabled' with details.shop_name matching, username=='master'."
+    },
+    {
+      "criterion": "Pricing ledger / pricing rules / shops indexes applied by ensure_indexes()",
+      "name": "test_tscheck_pricing_ledger_index.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Imported lib.db.db directly (shared Motor handle, not the FastAPI app) and asserted db.pricing_ledger.index_information() contains 'item_created_desc' with key {item_id:1, created_at:-1}; db.pricing_rules has 'version_desc' key {version:-1}; db.shops has unique 'id' index. Also sanity-checked GET /api/pricing/audit returns 200 for master. 2 passed."
+    },
+    {
+      "criterion": "No regressions on previously-passing till + merge checks",
+      "name": "till-sell-marks-item-sold-at-tag-price",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name, unchanged. Scan -> till dialog -> Mark sold at tag price -> success toast, dialog closes, item shows in sold filter."
+    },
+    {
+      "criterion": "No regressions on previously-passing till + merge checks",
+      "name": "admin-shop-merge-reassigns-and-deletes",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name, unchanged. Merge target selected, merge-and-delete succeeds, source shop gone from list."
+    },
+    {
+      "criterion": "No regressions on previously-passing till + merge checks",
+      "name": "till-already-sold-shows-graceful-message",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name, unchanged. Already-sold branch renders title + price, no confirm-sell button."
+    },
+    {
+      "criterion": "Backend suite regression",
+      "name": "pytest backend/tests",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 87 passed, 3 failed. All 3 failures are pre-existing/out-of-scope per spec_deviations: 2 appraise tests fail on a missing /tmp/item.jpg fixture image, test_shops_seeded_data fails on a Chiswick High Road needs_zone_review seed-flag residue from prior iterations. No new failures introduced by this iteration's fixes."
+    }
+  ]
+}

@@ -31,6 +31,16 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "users": [IndexModel([("username", ASCENDING)], name="username", unique=True)],
     "activity": [IndexModel([("timestamp", DESCENDING)], name="ts_desc")],
+    # pricing_ledger: `/pricing/audit` and `TagPage`'s latest-adjustment lookup both scan by
+    # `item_id` sorted on `created_at` descending. Index both so the lookup stays O(log N) as
+    # the ledger grows past the current ~tens of rows.
+    "pricing_ledger": [
+        IndexModel([("item_id", ASCENDING), ("created_at", DESCENDING)], name="item_created_desc"),
+    ],
+    # pricing_rules: `load_rules()` runs on every valuation and sorts by `version` desc to pick
+    # the current ruleset. Tiny today but the primary read path.
+    "pricing_rules": [IndexModel([("version", DESCENDING)], name="version_desc")],
+    "shops": [IndexModel([("id", ASCENDING)], name="id", unique=True)],
 }
 
 

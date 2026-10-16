@@ -350,6 +350,13 @@ async def mark_sold(item_id: str, body: SellRequest, session: dict = Depends(req
     if not doc:
         raise HTTPException(status_code=404, detail="Item not found")
     if body.sold:
+        # Idempotency: a till scan on a second device or a replayed POST must not overwrite the
+        # original sale (which may have been at an overridden/discounted price) and shift its
+        # timestamp into the current reporting week — that would silently corrupt the
+        # weekly/all-time "raised" dashboards. Reject with 409 so the till UI shows a clear
+        # "already sold" message instead of charging a second time.
+        if doc.get("status") == "sold":
+            raise HTTPException(status_code=409, detail="Item is already marked sold")
         price = body.sold_price if body.sold_price is not None else doc.get("recommended_price", 0)
         update = {
             "status": "sold",

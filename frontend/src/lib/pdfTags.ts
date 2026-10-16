@@ -23,8 +23,9 @@ import { gbp } from "@/lib/types";
 
 export type PdfTagSize = "A6" | "A7" | "A8";
 
-/** Physical size + layout knobs per tag size. Dimensions are mm; "cols/rows" is the exact
- * A4-aligned tiling (A6=2×2, A7=2×4, A8=4×4). Font sizes are pt because jsPDF uses pt natively. */
+/** Physical size + layout knobs per tag size. Dimensions are mm; "cols/rows" is the practical
+ * printed tiling on an A4 sheet (A6=2×2, A7=2×2 — the ISO fold yields 8×A7 per A4 only when the
+ * sheet is cut, uncut prints 4-up — A8=4×4). Font sizes are pt because jsPDF uses pt natively. */
 type PdfSpec = {
   w: number; // tag width mm
   h: number; // tag height mm
