@@ -1,6 +1,5 @@
 """Backend test for: Scan tag SKU lookup (200 for known SKU, 404 for unknown)."""
 
-import httpx
 
 from .conftest import api_url, login_client, VOLUNTEER_USERNAME, VOLUNTEER_PIN
 

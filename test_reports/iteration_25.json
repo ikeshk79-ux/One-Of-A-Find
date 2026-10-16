@@ -1,0 +1,96 @@
+{
+  "iteration": 25,
+  "mode": "retest",
+  "summary": "Regression retest after low-impact code-review pass: LoadingCard skeleton key changed from array-index to `skeleton-${i}` (no structural change), and dead `import httpx` lines removed from 3 test files. Re-ran full backend suite (same 80/83 pass, 3 pre-existing unrelated failures carried from iterations 19-23) and all 7 named iteration_24 print-tags/legacy-preview browser checks (all pass unchanged). Also re-ran the two browser checks that exercise LoadingCard on Finds/Inventory: finds-filters-and-legacy-inventory-route passed cleanly (Finds page, skeleton-then-populate flow, no console errors); inventory-loads-with-stats-and-items failed on both the first run and a rerun, but this is PRE-EXISTING stale-selector drift documented since iteration 14 (script expects `item-photo-slot`, an Appraise-page-only testid, right after login — a leftover from before the Home-landing redesign shipped many iterations ago) and is unrelated to the LoadingCard key change or the httpx import removals in this diff. No new regressions introduced by this change.",
+  "passed": 8,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 1,
+  "checks": [
+    {
+      "criterion": "Backend regression suite unaffected by httpx-import removals",
+      "name": "backend-full-suite",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 80 passed, 3 failed (identical pre-existing failures as iteration_24: test_appraise_with_real_image_returns_valid_appraisal and test_appraise_returns_200_three_times_in_a_row fail on missing /tmp/item.jpg fixture image; test_shops_seeded_with_14_known_branches fails on pre-existing Chiswick seed-flag residue, len==15 not 14). None of these touch the 3 edited test files or any LoadingCard-dependent route."
+    },
+    {
+      "criterion": "Print Tags page offers A6, A7, A8 as tag sizes with A8 default",
+      "name": "print-tags-size-options-default-a8",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED, same assertions as iteration_24 (3 size options, A8 default)."
+    },
+    {
+      "criterion": "Changing tag size re-renders grid at correct cols-per-row",
+      "name": "print-tags-size-changes-grid-cols",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED, data-tag-cols correct for A6/A7/A8."
+    },
+    {
+      "criterion": "Each tag renders at true physical mm size",
+      "name": "print-tags-true-mm-dimensions",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED, width/height mm values correct per size."
+    },
+    {
+      "criterion": "Copies-per-item multiplies tiles rendered",
+      "name": "print-tags-copies-multiplies-tiles",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED, 3->6 tiles on copies=2, empty treated as 1."
+    },
+    {
+      "criterion": "Cutting-guides toggle adds dashed borders and updates sheet summary",
+      "name": "print-tags-guides-toggle-and-sheet-summary",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED, dashed borders + sheet-count summary update confirmed."
+    },
+    {
+      "criterion": "URL params persist controls across reload",
+      "name": "print-tags-url-persists-on-reload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran against public preview URL, unchanged. PASSED, size/copies/guides survive reload."
+    },
+    {
+      "criterion": "Legacy /tag/{id} single-item preview still renders unsized layout",
+      "name": "tag-page-legacy-preview-unsized-layout",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED, no data-tag-size attr, legacy w-[340px] class intact."
+    },
+    {
+      "criterion": "LoadingCard key change has no visible/console regression on Finds list page",
+      "name": "finds-filters-and-legacy-inventory-route",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged. PASSED: Finds page loads (skeleton then populated grid), search/status filters work, legacy /inventory route still renders. No console key-warning errors reported."
+    },
+    {
+      "criterion": "LoadingCard key change has no visible/console regression on Inventory list page",
+      "name": "inventory-loads-with-stats-and-items",
+      "lane": "browser",
+      "status": "test_error",
+      "evidence": "Failed twice (not flaky): `expect(getByTestId('item-photo-slot')).toBeVisible()` times out right after SarahTest/master login, before the script ever reaches the Inventory page or stats/skeleton assertions. Screenshot confirms the app correctly renders the Home landing page (search bar, Capture Studio card) post-login — 'item-photo-slot' is an Appraise.tsx-only testid, a stale assumption from before the Home-landing redesign. This exact root cause and exact check name were already documented as failing in iteration_14.json (17 checks with the same stale-selector class). Unrelated to the LoadingCard key change or httpx import removals in this diff; no code evidence of a new regression on Inventory's skeleton/list render."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "pre_existing_out_of_scope_failures",
+      "severity": "low",
+      "detail": "Backend: same 3 pre-existing failures as iteration_24 (missing /tmp/item.jpg live-model fixture for 2 appraise tests; Chiswick High Road needs_zone_review seed-flag residue giving 15 shops instead of 14). Unrelated to this iteration's diff."
+    },
+    {
+      "type": "stale_selector_pre_existing",
+      "severity": "medium",
+      "detail": "inventory-loads-with-stats-and-items browser check has a stale `item-photo-slot` selector assuming post-login landing is /appraise; this predates the Home-landing redesign and was already flagged in iteration_14.json alongside 16 sibling checks. It did not newly break from the LoadingCard key change or httpx-import removal in this diff -- the failure point (login redirect target) is upstream of any LoadingCard render. Recommend the check be rewritten to land-assert on Home and then navigate to Inventory via nav-inventory, same pattern as the now-passing finds-filters-and-legacy-inventory-route check, in a future iteration (out of scope for this strictly-regression pass)."
+    }
+  ],
+  "retest_needed": true
+}

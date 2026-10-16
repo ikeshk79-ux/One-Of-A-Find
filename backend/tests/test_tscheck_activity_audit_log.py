@@ -1,6 +1,5 @@
 """Backend test for: activity audit log — role gating, and full CRUD lifecycle attribution/logging."""
 
-import httpx
 
 from .conftest import (
     MASTER_PIN,

@@ -1,6 +1,5 @@
 """Backend test for: Gift Aid sale allocation via PATCH /api/inventory/{id}/sell."""
 
-import httpx
 
 from .conftest import api_url, login_client, VOLUNTEER_USERNAME, VOLUNTEER_PIN
 
