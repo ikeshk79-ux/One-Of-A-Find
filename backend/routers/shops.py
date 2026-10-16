@@ -94,26 +94,52 @@ async def update_shop(shop_id: str, body: ShopUpdate, session: dict = Depends(re
 async def delete_shop(
     shop_id: str,
     mode: str = Query(default="disable"),
+    reassign_to: str | None = Query(default=None),
     _: dict = Depends(require_master),
 ):
     """Delete a shop. Defaults to a soft-disable so existing inventory items that reference
     this shop by name continue to render. Pass `?mode=remove` to hard-delete; the request is
     rejected with 409 if any inventory item still references the shop so the admin can either
-    disable instead or reassign items first."""
+    disable instead or reassign items first.
+
+    To **merge a duplicate branch into another**, pass `?mode=remove&reassign_to=<target_shop_id>`:
+    every inventory item (and pricing-ledger row) that currently points at this shop by name is
+    moved to the target shop's name first, then the source shop is hard-deleted.
+    """
     doc = await db.shops.find_one({"id": shop_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Shop not found")
 
     if mode == "remove":
+        # Merge path: reassign every linked item/ledger row to the target shop first, then
+        # proceed with the hard-delete. Both shops must exist and differ.
+        if reassign_to:
+            if reassign_to == shop_id:
+                raise HTTPException(status_code=422, detail="Cannot merge a shop into itself")
+            target = await db.shops.find_one({"id": reassign_to})
+            if not target:
+                raise HTTPException(status_code=404, detail="Target shop not found")
+            await db.inventory.update_many(
+                {"location": doc["name"]}, {"$set": {"location": target["name"]}}
+            )
+            await db.pricing_ledger.update_many(
+                {"shop_id": shop_id},
+                {"$set": {"shop_id": target["id"], "shop_name": target["name"]}},
+            )
+            await db.pricing_ledger.update_many(
+                {"shop_name": doc["name"], "shop_id": None},
+                {"$set": {"shop_name": target["name"]}},
+            )
+            await db.shops.delete_one({"id": shop_id})
+            return Shop(**_aware(doc))
+
         linked = await db.inventory.count_documents({"location": doc["name"]})
         if linked > 0:
             raise HTTPException(
                 status_code=409,
-                detail=f"{linked} item{'s' if linked != 1 else ''} still reference this shop — reassign or disable instead",
+                detail=f"{linked} item{'s' if linked != 1 else ''} still reference this shop — merge into another branch, reassign them, or disable this shop instead",
             )
         await db.shops.delete_one({"id": shop_id})
-        from models.shop import Shop
-
         return Shop(**_aware(doc))
 
     # Default: soft-disable (back-compat with the previous DELETE contract).
@@ -122,8 +148,6 @@ async def delete_shop(
         {"$set": {"disabled": True, "updated_at": datetime.now(timezone.utc)}},
         return_document=True,
     )
-    from models.shop import Shop
-
     return Shop(**_aware(updated))
 
 

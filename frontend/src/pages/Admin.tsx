@@ -3,8 +3,18 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Check, Loader2, Pencil, Plus, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
+import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
 import type { PricingRules, SessionInfo, Shop } from "@/lib/types";
+
+/** Pull the backend's `{detail: "..."}` out of an ApiError so volunteers see "3 items still
+ * reference this shop…" instead of the fetch wrapper's generic "request failed with 409". */
+function detailOf(e: Error): string {
+  if (e instanceof ApiError) {
+    const d = (e.body as { detail?: unknown } | null)?.detail;
+    if (typeof d === "string") return d;
+  }
+  return e.message;
+}
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -198,12 +208,14 @@ function ShopsSection() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         onSaved={() => void qc.invalidateQueries({ queryKey: ["shops"] })}
+        allShops={shops.data ?? []}
       />
       <ShopEditDialog
         shop={null}
         open={adding}
         onClose={() => setAdding(false)}
         onSaved={() => void qc.invalidateQueries({ queryKey: ["shops"] })}
+        allShops={shops.data ?? []}
       />
     </section>
   );
@@ -214,11 +226,13 @@ function ShopEditDialog({
   open,
   onClose,
   onSaved,
+  allShops,
 }: {
   shop: Shop | null;
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  allShops: Shop[];
 }) {
   const isNew = shop === null;
   const [name, setName] = useState("");
@@ -227,6 +241,7 @@ function ShopEditDialog({
   const [station, setStation] = useState("");
   const [zoneValue, setZoneValue] = useState("unmapped");
   const [needsReview, setNeedsReview] = useState(false);
+  const [mergeTarget, setMergeTarget] = useState<string>("");
 
   useEffect(() => {
     if (!open) return;
@@ -244,6 +259,7 @@ function ShopEditDialog({
         : "unmapped",
     );
     setNeedsReview(shop?.needs_zone_review ?? false);
+    setMergeTarget("");
   }, [open, shop]);
 
   const save = useMutation({
@@ -273,7 +289,7 @@ function ShopEditDialog({
       onSaved();
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message || "Save failed"),
+    onError: (e: Error) => toast.error(detailOf(e) || "Save failed"),
   });
 
   const disable = useMutation({
@@ -283,7 +299,7 @@ function ShopEditDialog({
       onSaved();
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message || "Disable failed"),
+    onError: (e: Error) => toast.error(detailOf(e) || "Disable failed"),
   });
 
   const reEnable = useMutation({
@@ -293,19 +309,28 @@ function ShopEditDialog({
       onSaved();
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message || "Re-enable failed"),
+    onError: (e: Error) => toast.error(detailOf(e) || "Re-enable failed"),
   });
 
   const remove = useMutation({
-    // Hard-delete via ?mode=remove. The backend refuses with 409 if any inventory item still
-    // references the shop by name, so the admin can either reassign items first or soft-disable.
-    mutationFn: async () => apiDelete<Shop>(`/shops/${shop!.id}?mode=remove`),
+    // Hard-delete via ?mode=remove. If a merge target was picked, the backend reassigns every
+    // linked inventory + ledger row to the target shop first; otherwise it refuses with 409
+    // when any item still points at this shop so the admin can disable or merge instead.
+    mutationFn: async () => {
+      const qs = mergeTarget ? `?mode=remove&reassign_to=${mergeTarget}` : "?mode=remove";
+      return apiDelete<Shop>(`/shops/${shop!.id}${qs}`);
+    },
     onSuccess: () => {
-      toast.success("Shop deleted");
+      toast.success(mergeTarget ? "Shop merged & deleted" : "Shop deleted");
       onSaved();
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message || "Delete failed"),
+    onError: (e: Error) => {
+      // Surface the backend's reason (e.g. "3 items still reference this shop — merge into
+      // another branch, reassign them, or disable this shop instead") instead of the generic
+      // "request failed with 409" the fetch wrapper falls back to.
+      toast.error(detailOf(e) || "Delete failed");
+    },
   });
 
   return (
@@ -382,6 +407,40 @@ function ShopEditDialog({
             </span>
           </label>
         </div>
+        {!isNew && !shop?.disabled && (
+          <div
+            className="space-y-1 rounded-xl border border-dashed border-border/70 bg-muted/40 p-3"
+            data-testid="admin-shop-merge-row"
+          >
+            <Label htmlFor="shop-merge-into" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Merge into another branch (optional)
+            </Label>
+            <Select value={mergeTarget || "none"} onValueChange={(v) => setMergeTarget(v === "none" ? "" : v)}>
+              <SelectTrigger
+                id="shop-merge-into"
+                className="h-10 rounded-lg bg-background"
+                data-testid="admin-shop-merge-target"
+              >
+                <SelectValue placeholder="Keep as its own branch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Keep as its own branch</SelectItem>
+                {allShops
+                  .filter((s) => s.id !== shop?.id && !s.disabled)
+                  .map((s) => (
+                    <SelectItem key={s.id} value={s.id} data-testid={`admin-shop-merge-option-${s.id}`}>
+                      {s.name}
+                      {s.zone != null ? ` · Zone ${s.zone}` : ""}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              If this shop is a duplicate, pick the branch to merge it into — every item and
+              pricing-ledger row will move to that branch and this shop will be removed.
+            </p>
+          </div>
+        )}
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2">
           {!isNew &&
             (shop?.disabled ? (
@@ -411,18 +470,18 @@ function ShopEditDialog({
                   size="sm"
                   className="text-destructive hover:text-destructive"
                   onClick={() => {
-                    if (
-                      typeof window !== "undefined" &&
-                      !window.confirm(`Permanently delete "${shop?.name}"? This cannot be undone.`)
-                    )
-                      return;
+                    const target = allShops.find((s) => s.id === mergeTarget);
+                    const confirmMsg = target
+                      ? `Merge "${shop?.name}" into "${target.name}" and delete it? Every linked item will move to ${target.name}.`
+                      : `Permanently delete "${shop?.name}"? This cannot be undone.`;
+                    if (typeof window !== "undefined" && !window.confirm(confirmMsg)) return;
                     remove.mutate();
                   }}
                   disabled={remove.isPending}
                   data-testid="admin-shop-delete"
                 >
                   <Trash2 className="size-4" />
-                  Delete
+                  {mergeTarget ? "Merge & delete" : "Delete"}
                 </Button>
               </div>
             ))}

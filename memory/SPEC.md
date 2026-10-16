@@ -178,11 +178,19 @@ flow once the volunteer has tapped through from Home.
 - Default (`?mode=disable` or no param) soft-disables (sets `disabled=true`) — back-compat with
   the previous contract so existing inventory items that reference the shop by name still render.
 - `?mode=remove` **hard-deletes** the row. Returns 409 with
-  `"N item(s) still reference this shop — reassign or disable instead"` if any inventory row's
-  `location` matches the shop name, so the admin can reassign or soft-disable first.
+  `"N item(s) still reference this shop — merge into another branch, reassign them, or disable this shop instead"`
+  if any inventory row's `location` matches the shop name, so the admin can merge or soft-disable
+  first.
+- `?mode=remove&reassign_to=<target_shop_id>` **merges duplicates**: every `inventory.location`
+  and `pricing_ledger.shop_id`/`shop_name` row pointing at the source shop is moved to the
+  target branch, then the source is hard-deleted. 422 if the target is the same shop; 404 if
+  the target doesn't exist.
 Admin UI exposes both as separate buttons in the shop edit dialog ("Disable" / "Delete",
-testids `admin-shop-disable` / `admin-shop-delete`); Delete opens a browser `window.confirm`
-before firing.
+testids `admin-shop-disable` / `admin-shop-delete`); a "Merge into another branch (optional)"
+Select above the footer (`admin-shop-merge-target`) picks the target, in which case the
+Delete button becomes "Merge & delete" and the confirm prompt names the receiving branch.
+Delete opens a browser `window.confirm` before firing. Error toasts now surface the backend's
+`detail` string (via `detailOf()`) instead of the generic "request failed with 409".
 
 ## Appraisal response parsing (grounded Gemini)
 `POST /api/appraise` runs Gemini 3 Flash **with Google Search grounding**, which sometimes makes the

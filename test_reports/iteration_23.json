@@ -1,0 +1,63 @@
+{
+  "iteration": 23,
+  "mode": "generate",
+  "summary": "New feature: shop delete/merge workflow in /admin (merge duplicate shop into another branch, backend-detail error surfacing via detailOf()). Added 1 backend test file (3 tests) covering merge reassignment, self-merge/missing-target rejection, and the PATCH name-collision detail string. Added 5 named browser checks covering all 5 acceptance-matrix criteria end to end (blocked delete toast, merge flow + API cross-check, merge-row visibility rules, hard delete with no items, save-collision toast). Ran the full backend suite (83 tests): 3 pre-existing out-of-scope failures unrelated to this work (appraise live-model fixture + shared-seed-data residue from other test files mutating the Chiswick/Zone-count seed rows across prior iterations) — none touch shops/merge code. All 5 browser checks passed, one of them (hard-delete, no linked items) run against the public preview URL per instructions.",
+  "passed": 6,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "Merging a duplicate shop into another branch reassigns its inventory and deletes it (backend reassignment + rejection semantics)",
+      "name": "test_tscheck_shop_merge.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "DELETE /api/shops/{src}?mode=remove&reassign_to={tgt}: 200; follow-up GET /api/shops?include_disabled=1 confirms src removed, tgt present; GET /api/inventory/{item_id} -> location == target shop name. Self-merge (reassign_to==shop_id) -> 422; merge into unknown id -> 404. PATCH rename collision -> 409 with detail=='Another shop already uses that name' (exact match). 3/3 passed."
+    },
+    {
+      "criterion": "Deleting a shop with linked inventory shows the backend's reason, not a generic '409'",
+      "name": "admin-shop-delete-blocked-shows-backend-reason",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-delete-blocked-<ts> shop via UI, linked an inventory item to it via the page's own authenticated API session, opened its edit dialog, left merge target as 'Keep as its own branch', tapped Delete (confirm auto-accepted). Toast text 'X item(s) still reference this shop...' visible; 'request failed with 409' text absent; admin-shop-dialog remained visible/open. Cleaned up item + shop afterward."
+    },
+    {
+      "criterion": "Merging a duplicate shop into another branch reassigns its inventory and deletes it (UI flow)",
+      "name": "admin-shop-merge-reassigns-and-deletes",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-merge-src/tgt-<ts> shops + a linked item via UI/API. Selected target in admin-shop-merge-target (admin-shop-merge-option-<id>); delete button label changed to 'Merge & delete'; clicked, confirm auto-accepted; toast 'Shop merged & deleted' shown, dialog closed. Cross-check: GET /api/shops no longer lists src; GET /api/inventory/{item_id}.location === target shop name."
+    },
+    {
+      "criterion": "The Merge Select is hidden for new shops and disabled shops",
+      "name": "admin-shop-merge-row-hidden-new-and-disabled",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Add-shop dialog: admin-shop-merge-row count 0. Created+disabled a fixture shop: merge row visible before disabling (enabled state), count 0 after reopening its dialog post-disable. Cleaned up via hard-delete."
+    },
+    {
+      "criterion": "Hard-delete still works when no items reference the shop",
+      "name": "admin-shop-hard-delete-no-items",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran against public preview URL https://thrift-vision.preview.emergentagent.com. Created scratch shop 'tscheck-delete-me-<ts>' via master-session API, opened it in /admin, left merge target empty, Delete -> toast 'Shop deleted', GET /api/shops?include_disabled=1 no longer lists it."
+    },
+    {
+      "criterion": "Save/Disable/Re-enable error toasts also surface the backend detail string",
+      "name": "admin-shop-save-name-collision-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-collide-a/b-<ts> shops, renamed b to a's name and saved -> toast 'Another shop already uses that name' visible, 'request failed with 409' absent, dialog stayed open (save failure). Cleaned up both shops."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "pre_existing_out_of_scope_failures",
+      "severity": "low",
+      "detail": "Full backend suite (83 tests) has 3 pre-existing failures unrelated to this iteration's shop-merge work: test_tscheck_appraise_endpoint.py::test_appraise_with_real_image_returns_valid_appraisal and test_tscheck_appraise_robustness_and_gating.py::test_appraise_returns_200_three_times_in_a_row (missing live-model /tmp fixture image), and test_tscheck_shops_seeded_data.py::test_shops_seeded_with_14_known_branches (Chiswick High Road's needs_zone_review flag was flipped to false by some other test's PATCH residue in a prior iteration — shared-seed mutation, not something this iteration's tests touch). Flagged here for visibility only; carried over from iterations 19-22."
+    }
+  ],
+  "retest_needed": false
+}
