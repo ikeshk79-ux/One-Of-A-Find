@@ -1,0 +1,58 @@
+{
+  "iteration": 36,
+  "mode": "retest",
+  "task": "Lean regression sanity check re-running iteration_35's /print-tags mobile matrix (390x844) after a code-review report whose 'critical' items were confirmed false positives (missing-hook-deps on stable imports, sessionStorage CSRF mislabeled as localStorage auth token, PEP-8-correct `is True`/`is None` flagged as literal-is bugs, vite.config.ts console.warn flagged as prod code). No application code was changed.",
+  "summary": "Re-ran all 6 acceptance criteria from iteration_35 against the public preview URL on 390x844. 'print-tags-controls-full-width-mobile' reran clean unchanged. The other 3 persisted checks ('print-tags-preview-grid-scrollable', 'print-tags-long-price-title-no-overlap', 'print-tags-open-pdf-button-works') initially FAILED on rerun -- not an app regression: they referenced hardcoded fixture item ids that iteration_35's own cleanup step deleted at the end of that run (confirmed via authenticated GET /api/inventory/{id} -> 404 'Item not found' for both ids). This is a test-artifact fragility, not a code bug. Fixed by rewriting the 3 checks to create their own tscheck-* fixture items via the app's authenticated POST /api/inventory at the start of each run (matching the fixture-creation pattern already used elsewhere in the suite, e.g. condition-edit-persists-after-reload) and delete them at the end. Re-ran after the fix: all 3 passed with the same layout numbers as iteration_35 (grid scrollWidth 809 vs clientWidth 358, price/QR no overlap at £225.00, 2-line title clamp, PDF ready toast with zero console errors). Confirmed zero tscheck-* residue in inventory afterward. No application/product code was touched -- only the test checks' own fixture-creation logic.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "The persisted browser checks 'print-tags-preview-grid-scrollable', 'print-tags-long-price-title-no-overlap', and 'print-tags-open-pdf-button-works' previously hardcoded fixture item ids from a one-off seed, which broke on rerun once those fixtures were cleaned up. They now self-seed tscheck-* fixtures and clean up after themselves, making them rerun-safe going forward -- no further action needed, noted for traceability only."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Controls card uses full viewport width on mobile",
+      "name": "print-tags-controls-full-width-mobile",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran unchanged. controls box {x:16,y:311,width:358,height:329.5}; heading box x:16; document scrollWidth(390)==clientWidth(390)."
+    },
+    {
+      "criterion": "Preview grid is horizontally scrollable, does not shrink the page",
+      "name": "print-tags-preview-grid-scrollable",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Initial rerun FAILED (locator 'print-tags-grid' timeout) because hardcoded fixture ids 7ac6d3bf.../30a1cf31... 404'd (confirmed via authenticated curl: {\"detail\":\"Item not found\"}, HTTP 404) -- those rows were deleted by iteration_35's own cleanup. Rewrote check to self-seed 2 tscheck-* items via POST /api/inventory. Rerun: gridMetrics scrollWidth=809>clientWidth=358; overflow parent scrollWidth=825>clientWidth=390; document scrollWidth(390)==clientWidth(390) before/after A6 switch (cols=2). Fixtures deleted by the check at the end."
+    },
+    {
+      "criterion": "No QR/price overlap on long prices",
+      "name": "print-tags-long-price-title-no-overlap",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Initial rerun FAILED on same stale-fixture-id cause as above. Rewrote to self-seed a tscheck-* £225.00 item. Rerun: priceText '£225.00', price right-edge x=36.0 <= qr.x 40.0+1; price computed style overflow:hidden/textOverflow:ellipsis. Fixture deleted at end."
+    },
+    {
+      "criterion": "Long title clamps to 2 lines",
+      "name": "print-tags-long-price-title-no-overlap",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same rerun as above. tag-title computed -webkit-line-clamp:2; boundingBox height 21.25px (<=30px ceiling)."
+    },
+    {
+      "criterion": "A6 preview also laid out cleanly",
+      "name": "print-tags-preview-grid-scrollable",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same rerun as the grid-scrollable check: switched to A6 via print-size-select -> print-size-option-A6; data-tag-cols='2'; document scrollWidth(390)==clientWidth(390) after switch."
+    },
+    {
+      "criterion": "Open PDF button still works",
+      "name": "print-tags-open-pdf-button-works",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Initial rerun FAILED (toast 'PDF ready' never appeared) same stale-fixture-id cause. Rewrote to self-seed 2 tscheck-* items. Rerun: clicked print-sheet-button, 'PDF ready' toast visible within 20s, console errors array empty."
+    }
+  ],
+  "cleanup": "All checks that create tscheck-* fixtures now delete them at the end of their own run (verified via GET /api/inventory: 0 rows containing 'tscheck' remain post-run). No manual cleanup required."
+}
