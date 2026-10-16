@@ -1,0 +1,80 @@
+{
+  "iteration": 31,
+  "mode": "generate",
+  "task": "Verify the fix for the reported bug where the printed PDF tag's item title overlapped the brand logo on A6 (and would have on A7/A8 too). Root cause fixed in /app/frontend/src/lib/pdfTags.ts drawTag(): the brand row is now anchored to an explicit rowTop, the logo is drawn at rowTop (not shifted up), the brand baseline is vertically centred against the logo, and titleTop = Math.max(logoBottom, brandBaseline) + 1 guarantees the title always starts strictly below the logo. Added 4 new checks to directly assert no dark/ink pixels fall inside the logo's red footprint on A6/A7/A8, plus a title-position check for the unbranded (no-logo) path, and re-ran the 4 existing regression checks (logo visibility on all 3 sizes + the button/toast flow) unchanged.",
+  "passed": 9,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing backend failures (out of scope, unchanged from prior iterations): test_tscheck_appraise_robustness_and_gating / test_tscheck_appraise_endpoint fail because the /tmp/item.jpg fixture image is missing from this environment; test_tscheck_shops_seeded_data expects Chiswick High Road needs_zone_review=True but got False (seed-flag residue from prior iterations)."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "A6 tag: title does NOT overlap logo",
+      "name": "pdf-title-no-overlap-logo-a6",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "New check. 1 fresh tscheck Nike item ('Nike Air Max 90 Trainers Mens Size 10 Running Shoes') at A6 with a mocked all-red unavatar.io PNG. Sampled the logo's exact footprint computed from drawTag()'s own rowTop formula (bandBottom+padding*0.5): redFrac=1 (logo fully present), inkCount=0 out of 289 sampled points — no dark title/brand text pixels inside the logo box. numPages=1."
+    },
+    {
+      "criterion": "A7 tag: title does NOT overlap logo",
+      "name": "pdf-title-no-overlap-logo-a7",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "New check. Same fixture/mock at A7. redFrac=1, inkCount=0 out of 196 sampled points inside the 7mm logo box. numPages=1."
+    },
+    {
+      "criterion": "A8 tag: title does NOT overlap logo",
+      "name": "pdf-title-no-overlap-logo-a8",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "New check. Same fixture/mock at A8. redFrac=1, inkCount=0 out of 289 sampled points inside the 5mm logo box. numPages=1."
+    },
+    {
+      "criterion": "Unbranded (no logo) A6 tag: title is drawn where expected",
+      "name": "pdf-unbranded-title-below-brand-row",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "New check. 1 fresh tscheck 'Unbranded'/'Something Nice' item at A6. Computed brandBaseline=15.8mm, expected titleTop=16.8mm; first detected ink row below the brand baseline was at 18.5mm (>= brandBaseline, i.e. title drawn after/below brand text, not overlapping it). No console/page errors, numPages=1."
+    },
+    {
+      "criterion": "Regression: logo still visible on all three sizes",
+      "name": "pdf-logo-embeds-nike-a8",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name, unchanged. All 16 A8 tiles sampled 100% (25/25) red in the computed 5mm logo box. numPages=1."
+    },
+    {
+      "criterion": "Regression: logo still visible on all three sizes",
+      "name": "pdf-logo-size-a6-10mm",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name, unchanged. All 4 A6 tiles sampled 100% (64/64) red in the 10mm logo box. numPages=1."
+    },
+    {
+      "criterion": "Regression: logo still visible on all three sizes",
+      "name": "pdf-logo-size-a7-7mm",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran by name, unchanged. All 4 on-page A7 tiles sampled 100% (49/49) red in the 7mm logo box. numPages=1."
+    },
+    {
+      "criterion": "Regression: button generating state + success toast",
+      "name": "print-sheet-button-generating-state-and-toast",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran existing check by name, unchanged. sawGenerating=true, genCalls=1, openCalls=1, 'PDF ready' toast fired, grid remained visible throughout."
+    },
+    {
+      "criterion": "Backend suite regression (pre-existing failures tracked, unrelated to this fix)",
+      "name": "pytest backend/tests",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q: 80 passed, 3 failed. All 3 failures are pre-existing/out-of-scope per briefing's spec_deviations: 2 appraise tests fail on a missing /tmp/item.jpg fixture image, and test_shops_seeded_data fails on a Chiswick High Road needs_zone_review seed-flag residue from prior iterations. No new failures introduced by the pdfTags.ts fix."
+    }
+  ]
+}

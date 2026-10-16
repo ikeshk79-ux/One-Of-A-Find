@@ -212,14 +212,14 @@ async function drawTag(
   const brandTextX = hasLogo ? inner.x + logoMm + 1.5 : inner.x;
   const brandTextW = inner.w - (hasLogo ? logoMm + 1.5 : 0);
 
-  let cursor = bandBottom + padding * 0.5 + brandFs * 0.35;
+  // Lay out the brand row anchored to a known top edge (rowTop), then place the title BELOW the
+  // logo's bottom edge so the two never collide. The previous attempt used a running cursor seeded
+  // off the brand baseline, which left the title drawn on top of a tall A6 logo.
+  const rowTop = bandBottom + padding * 0.5;
   let logoDrawn = false;
   if (hasLogo && logoDataUrl) {
-    // Place the logo so its top aligns with the brand-name baseline-ish row. jsPDF addImage uses
-    // top-left origin so (brandTextX offset left, cursor-ish y) — nudge up by 0.3mm so it sits
-    // visually balanced with the uppercase brand text.
     try {
-      pdf.addImage(logoDataUrl, "PNG", inner.x, cursor - brandFs * 0.3, logoMm, logoMm);
+      pdf.addImage(logoDataUrl, "PNG", inner.x, rowTop, logoMm, logoMm);
       logoDrawn = true;
     } catch {
       // A corrupt PNG the magic-number check didn't catch (e.g. truncated download) must not
@@ -231,10 +231,29 @@ async function drawTag(
   pdf.setFontSize(brandFs);
   const brandDrawX = logoDrawn ? brandTextX : inner.x;
   const brandDrawW = logoDrawn ? brandTextW : inner.w;
-  pdf.text(fitText(pdf, (item.brand ?? "").toUpperCase(), brandDrawW), brandDrawX, cursor);
-  cursor += Math.max(titleFs * 0.5, logoDrawn ? logoMm - brandFs * 0.3 + 0.5 : titleFs * 0.5);
+  // Brand baseline sits vertically centred against the logo square, or just below rowTop when
+  // there is no logo. brandFs is in pt and jsPDF's baseline is at the glyph bottom, so centring
+  // the row by (logoMm/2 + brandFs*0.3) looks visually balanced for Helvetica.
+  const brandBaseline = logoDrawn
+    ? rowTop + logoMm / 2 + brandFs * 0.3
+    : rowTop + brandFs * 0.35;
+  pdf.text(
+    fitText(pdf, (item.brand ?? "").toUpperCase(), brandDrawW),
+    brandDrawX,
+    brandBaseline,
+  );
+
+  // Title starts strictly below the logo bottom (or below the brand text when no logo). Use the
+  // taller of the two so A6/A7 (tall logo) and A8 (short logo + taller brand text) both clear.
+  const titleTop = Math.max(
+    logoDrawn ? rowTop + logoMm : brandBaseline,
+    brandBaseline,
+  ) + 1;
   pdf.setFontSize(titleFs);
-  pdf.text(fitText(pdf, item.title ?? "", inner.w), inner.x, cursor);
+  const titleBaseline = titleTop + titleFs * 0.4;
+  pdf.text(fitText(pdf, item.title ?? "", inner.w), inner.x, titleBaseline);
+
+  let cursor = titleBaseline;
 
   // Category + size (one line, muted colour).
   cursor += metaFs * 0.6 + 0.4;
