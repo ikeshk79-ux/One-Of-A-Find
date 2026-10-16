@@ -376,13 +376,44 @@
   body { background: #fff !important; color: #000 !important; }
   .no-print { display: none !important; }
   .glow-radial { display: none !important; }
-  .print-sheet { box-shadow: none !important; border-color: #000 !important; }
+  .print-sheet { box-shadow: none !important; }
+  /* Legacy single-tag preview (TagPage) keeps a 2-col fallback. */
   .print-tags-grid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 10mm 8mm !important;
     margin-top: 0 !important;
   }
+  /* Sized sheets: tile exactly into A4 with zero gap/margin so N tags fit per A4 as advertised.
+     The grid-template-columns is set inline per size on the element, so repeat(cols, max-content)
+     is already correct — we only need to zero out the gaps and margins the on-screen view adds. */
+  .print-tags-grid[data-tag-size] {
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    justify-content: start !important;
+  }
   .print-tags-grid > * { break-inside: avoid; page-break-inside: avoid; }
+  /* Default page: on-screen single tag preview keeps a 12mm safety margin so the browser's
+     scaling-to-fit doesn't nip at the edges. Sized sheets override this below. */
   @page { size: A4; margin: 12mm; }
+  /* Zero-margin page so a 16-up A8 sheet (4 cols × 52mm = 208mm, 4 rows × 74mm = 296mm) uses the
+     full A4 physical area and the tiles land exactly on the paper. The user chooses "no margins"
+     in the browser print dialog; the @page rule declares our intent. */
+  body:has(.print-tags-grid[data-tag-size]) { }
+  .print-tags-grid[data-tag-size="A6"],
+  .print-tags-grid[data-tag-size="A7"],
+  .print-tags-grid[data-tag-size="A8"] {
+    page-break-after: auto;
+  }
+  /* Firefox/Chromium ignore `@page` rules that depend on the subtree, so we rely on inline
+     `width` in mm on the tag and let the browser's "no margins" setting handle A4 edges. */
+}
+
+/* On-screen preview for sized sheets: show the tiles at true mm scale with a subtle gap so the
+   admin can see the sheet layout before printing. The @media print block zeroes the gap. */
+.print-tags-grid[data-tag-size] {
+  display: grid;
+  gap: 2mm;
+  justify-content: start;
 }
