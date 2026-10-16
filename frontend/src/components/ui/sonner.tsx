@@ -24,6 +24,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme}
       // bottom-right: top positions sit on the header nav and swallow clicks; bottom-left is the preview bug button
       position="bottom-right"
+      // Mobile has a fixed bottom tab bar (BottomNavigation, ~64px tall + safe-area) that a
+      // bottom-anchored toast would otherwise cover — raise toasts above it so volunteers can
+      // still reach the Home/Finds/More tabs while a confirmation is on screen.
+      mobileOffset={{ bottom: "calc(72px + env(safe-area-inset-bottom, 0px))", right: "12px", left: "12px" }}
       className="toaster group"
       icons={{
         success: (
