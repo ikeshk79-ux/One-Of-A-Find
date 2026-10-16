@@ -1,0 +1,60 @@
+{
+  "iteration": 28,
+  "mode": "generate",
+  "task": "Verify the NEW print flow on /print-tags produces an A4 PDF that correctly tiles 16 A8 / 8 A7 / 4 A6 tags per page with no overlapping QR/barcode, replacing the broken window.print() mobile flow.",
+  "passed": 6,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "bugs": [],
+  "action_items": [
+    "Minor non-blocking note: URL.createObjectURL emits an 'image/svg+xml' blob per QR/barcode render before the final 'application/pdf' blob — any future check reusing this capture pattern must filter by blob.type === 'application/pdf' rather than assuming blobs[0] is the PDF.",
+    "Minor note: duplicating the same item id twice in the ids= query param (only done by the multipage test to synthesize 32 tiles from 16 seed items) triggers a benign React 'duplicate key' console warning in the on-screen preview grid — not a real-world scenario (a volunteer can't select the same inventory row twice from Finds) and not a bug in the PDF generator itself."
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "A8 PDF: exact A4 size and 16 tiles per page in a 4x4 grid",
+      "name": "print-tags-a8-16-tiles",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Captured real Blob from generateTagsPdf via patched URL.createObjectURL on click of [data-testid=print-sheet-button] with 16 seeded tscheck-print-* items at size=A8&copies=1&guides=0. Blob header '%PDF-1.3', size 82877 bytes, type application/pdf. Summary text confirmed '16 tags on 1 A4 sheet'. Success toast 'PDF ready — open in your PDF viewer to print' shown."
+    },
+    {
+      "criterion": "A8 PDF exact A4 dims + 16-tile grid + no QR/barcode overlap (deep pdfjs validation)",
+      "name": "print-tags-a8-pdfjs-grid-overlap",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Parsed the captured PDF Blob in-browser with pdfjs-dist@4.4.168 (esm.sh). doc.numPages===1. Page-1 viewport at scale 1: 595.28x841.89pt (= 210x297mm A4, within 2pt tolerance). Rendered to canvas at scale 3 and sampled all 16 tile header+body bands (col/row grid, origin (1,0.5)mm, 52x74mm tiles): all 16 report non-empty content. Row-band scan within each tile bbox found >=8 distinct ink bands with a clear white gap preceding the final (barcode) band in all 16 tiles -> no QR/barcode/text overlap. Visual render screenshot confirmed clean 4x4 layout with brand/title header, PRICE+QR block, and barcode strip each visually separated by whitespace."
+    },
+    {
+      "criterion": "A7 PDF: tiles fit without overlap (8 items, 2x4 grid) / A6 PDF: 4 tiles in 2x2 grid",
+      "name": "print-tags-a7-a6-single-page",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "A7: 8 seeded items, size=A7&copies=1 -> parsed PDF via pdfjs, doc.numPages===1, rendered canvas nonWhite pixel count 274043 (clear tag content present, no blank page). A6: 4 seeded items, size=A6&copies=1 -> doc.numPages===1, nonWhite 317902."
+    },
+    {
+      "criterion": "Multi-page: 32 items at A8 produce 2 pages, 48 tiles (16 items x3 copies) produce 3 pages",
+      "name": "print-tags-multipage-pagination",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "32 ids (16 seeded items doubled) at size=A8&copies=1 -> parsed PDF doc.numPages===2. 16 seeded items at size=A8&copies=3 (48 tiles) -> doc.numPages===3. Both exact matches to perSheet=16 pagination math."
+    },
+    {
+      "criterion": "'Open PDF for printing' button fires generateTagsPdf once, shows Generating state, then success toast; preview grid stays visible",
+      "name": "print-sheet-button-generating-state-and-toast",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Patched window.open (stub, counted calls) and URL.createObjectURL (counted application/pdf blobs) before clicking [data-testid=print-sheet-button]. Observed button label transiently read 'Generating…' (sawGenerating=true) before reverting to 'Open PDF for printing'. Exactly 1 PDF blob generated (genCalls=1) and window.open called exactly once (openCalls=1) -- no double-fire. Success toast 'PDF ready — open in your PDF viewer to print' visible. [data-testid=print-tags-grid] remained visible/unchanged after generation (on-screen sanity preview correctly left in place)."
+    },
+    {
+      "criterion": "Backend data fixture support (16 PAT-passed, non-electrical tscheck-print-* items available for the PDF flow)",
+      "name": "seed_tscheck_print_items_via_api",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/inventory (cookie session as master, CSRF header) x16 -> 201 with body {appraisal:{title:'tscheck-print-NN Jacket', category:'Homewear', is_electrical:false, price_source:'charity', ...}}. All 16 created successfully with distinct ids/skus and status='available', confirmed via GET /api/inventory?search=tscheck-print returning 23 total rows (7 pre-existing + 16 new)."
+    }
+  ]
+}

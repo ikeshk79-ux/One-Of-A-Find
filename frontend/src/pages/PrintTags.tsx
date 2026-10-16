@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, FileDown, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import PriceTag, { type TagSize } from "@/components/PriceTag";
 import { apiGet } from "@/lib/api";
+import { generateTagsPdf } from "@/lib/pdfTags";
 import type { InventoryItem } from "@/lib/types";
 
 /** Per-size layout metadata. The grid tiles exactly into A4 (zero-margin page) so there's no
@@ -65,6 +67,32 @@ export default function PrintTags() {
     retry: false,
   });
 
+  const [generating, setGenerating] = useState(false);
+
+  const openPdf = async () => {
+    // Mobile browser `window.print()` ignores `@page { margin: 0 }` and applies a system scale
+    // factor, so the mm layout gets squished (users saw 4 A8 tags per sheet instead of 16).
+    // We hand the user a PDF generated with absolute mm coords instead — the native PDF viewer
+    // honours those unconditionally and the printer sees the exact tiling we drew.
+    if (printable.length === 0) return;
+    setGenerating(true);
+    try {
+      await generateTagsPdf({
+        items: printable,
+        size,
+        copies,
+        showCutGuide: guides,
+        filename: `oneofafind-tags-${size}-${Date.now()}.pdf`,
+      });
+      toast.success("PDF ready — open in your PDF viewer to print");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not generate PDF");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const byId = new Map((data ?? []).map((i) => [i.id, i]));
   // Preserve the order the volunteer selected them in.
   const ordered = ids
@@ -95,6 +123,10 @@ export default function PrintTags() {
             {copies > 1 ? ` (${copies} copies × ${printable.length} item${printable.length === 1 ? "" : "s"})` : ""}
             {skipped > 0 ? ` · ${skipped} skipped (PAT test required)` : ""}
           </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Tapping "Open PDF" downloads an A4 PDF — print from your PDF viewer so the tags land at
+            true physical size (mobile browser print scales the layout).
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/inventory" className={buttonVariants({ variant: "outline" })}>
@@ -104,11 +136,11 @@ export default function PrintTags() {
           <Button
             className="bg-gold text-gold-ink hover:bg-gold-dim"
             data-testid="print-sheet-button"
-            disabled={tiles.length === 0}
-            onClick={() => window.print()}
+            disabled={tiles.length === 0 || generating}
+            onClick={openPdf}
           >
-            <Printer className="size-4" />
-            Print sheet
+            {generating ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
+            {generating ? "Generating…" : "Open PDF for printing"}
           </Button>
         </div>
       </div>
