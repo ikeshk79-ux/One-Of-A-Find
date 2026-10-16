@@ -1,0 +1,80 @@
+{
+  "iteration": 33,
+  "mode": "generate",
+  "summary": "Verified the security-audit fixes: AI daily quota, shop-merge disabled-target guard, and Permissions-Policy header all work as specified. Found one real bug: the AI burst limiter can be bypassed by concurrent requests due to a check-then-act race (timestamp is appended to the in-memory window only AFTER an `await` on Mongo, so simultaneous requests all pass the length check before any of them records itself).",
+  "passed": 6,
+  "failed": 1,
+  "flaky": 1,
+  "blocked": 0,
+  "test_error": 0,
+  "checks": [
+    {
+      "criterion": "AI burst limiter blocks a rapid retry loop",
+      "name": "test_tscheck_ai_quota_burst.py::test_burst_limit_blocks_sixth_rapid_blurb_call",
+      "lane": "backend",
+      "status": "failed",
+      "evidence": "6 concurrent POST /api/inventory/{id}/blurb calls (fired via ThreadPoolExecutor, same session, well inside the 10s window) all returned 200 — no 429 was ever raised, on two separate runs. Root cause confirmed by code read of lib/ai_quota.py: the burst check (`if len(dq) >= AI_BURST_LIMIT: raise`) runs, then the function `await`s `db.ai_quota.find_one_and_update(...)` for the daily cap, and only appends `now` to `dq` AFTER that await resolves. Concurrent requests therefore all observe the pre-append `dq` state and all pass. Note: sequential (one-at-a-time, wait-for-response) retries also fail to trip the limiter in practice because each real LLM-backed blurb call takes ~5-6s, so by the time 5 calls complete (~25-30s) the earliest timestamps have already aged out of the 10s window — the limiter is effectively unreachable under both realistic access patterns tested."
+    },
+    {
+      "criterion": "AI daily quota blocks when exhausted",
+      "name": "test_tscheck_ai_quota_daily.py::test_daily_quota_blocks_when_already_at_cap_then_recovers_after_removal",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Pre-seeded db.ai_quota={username, bucket: today, count: 60}; POST /api/inventory/{id}/blurb -> 429 detail='Daily AI quota reached — try again tomorrow'. After db.ai_quota.delete_one(...), same call -> 200."
+    },
+    {
+      "criterion": "Shop merge into a disabled target is refused",
+      "name": "test_tscheck_shop_merge_disabled_target.py::test_merge_into_disabled_target_rejected_with_422_no_mutation",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "DELETE /api/shops/{target} (disable) -> 200; DELETE /api/shops/{src}?mode=remove&reassign_to={disabled_target} -> 422 detail='Target shop is disabled — re-enable it before merging'. Follow-up GET /api/shops?include_disabled=1 confirms source shop still present and GET /api/inventory/{item} still shows location=source_name (no partial mutation)."
+    },
+    {
+      "criterion": "Shop merge into a different, active target still works",
+      "name": "test_tscheck_shop_merge_disabled_target.py::test_merge_into_active_target_still_succeeds",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "DELETE /api/shops/{src}?mode=remove&reassign_to={active_target} -> 200; source_id absent from subsequent listing, item location migrated to target_name. Regression guard intact."
+    },
+    {
+      "criterion": "Permissions-Policy header is present on API responses",
+      "name": "test_tscheck_permissions_policy_header.py::test_permissions_policy_and_existing_security_headers_present",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/auth/me -> 200, headers['permissions-policy'] contains 'camera=()', 'geolocation=()', 'microphone=()', no '*'. Pre-existing headers unchanged: x-content-type-options=nosniff, x-frame-options=DENY, referrer-policy=no-referrer, strict-transport-security has max-age, content-security-policy has default-src 'none'."
+    },
+    {
+      "criterion": "ai_quota collection has the TTL + unique index",
+      "name": "test_tscheck_ai_quota_indexes.py::test_ai_quota_has_unique_user_bucket_and_ttl_indexes",
+      "lane": "backend",
+      "status": "flaky",
+      "evidence": "Failed only when scheduled alongside the slow burst test under pytest-xdist (-n 2 --dist loadscope): 'RuntimeError: Event loop is closed' — a worker-teardown race, not an application bug. Passed cleanly (1 passed) on two standalone reruns: db.ai_quota.index_information() returns 'user_bucket' (unique on username+bucket) and 'expires_ttl' (expireAfterSeconds=0)."
+    },
+    {
+      "criterion": "Replayed sell idempotency (regression from iteration_32)",
+      "name": "test_tscheck_sell_idempotency.py::test_replayed_sell_rejected_with_409_and_preserves_original_sale",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "First PATCH /api/inventory/{id}/sell {sold:true, sold_price:5.00} -> 200. Replay with sold_price:99.99 -> 409 detail='Item is already marked sold'. GET readback still shows sold_price=5.00 and original sold_at unchanged."
+    }
+  ],
+  "bugs": [
+    {
+      "severity": "high",
+      "criterion": "AI burst limiter blocks a rapid retry loop",
+      "description": "lib/ai_quota.py's burst limiter is a TOCTOU race: enforce_ai_quota() checks `len(dq) >= AI_BURST_LIMIT` synchronously, then `await`s a Mongo round trip for the daily cap, and only appends the new timestamp to `dq` AFTER that await resolves. Any requests that arrive concurrently (same user, multiple tabs/devices, or a simple automated loop that doesn't wait for each response) all read the same pre-append `dq` state and all pass, regardless of AI_BURST_LIMIT. Separately, because each blurb/appraise call is a real multi-second LLM round trip, a purely sequential rapid-retry loop also never accumulates AI_BURST_LIMIT entries inside the 10s window before the earliest entries age out — so the burst cap is not reachable via either sequential or concurrent realistic retry patterns in this test. Fix direction: append the timestamp to `dq` (or at least reserve a slot) before the daily-cap await, and roll it back only if the daily check then rejects.",
+      "evidence": "backend/tests/test_tscheck_ai_quota_burst.py::test_burst_limit_blocks_sixth_rapid_blurb_call — 6 concurrent POST /api/inventory/{id}/blurb all returned 200 (expected 5x200 + 1x429), reproduced on 2 consecutive runs."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "flaky_test",
+      "detail": "test_tscheck_ai_quota_indexes.py intermittently fails with 'Event loop is closed' only under pytest-xdist loadscope when scheduled next to the slow concurrent burst test; passes reliably standalone. No code change needed; informational."
+    },
+    {
+      "type": "pre_existing_out_of_scope",
+      "detail": "test_tscheck_appraise_endpoint.py / test_tscheck_appraise_robustness_and_gating.py fail on a missing /tmp/item.jpg fixture image (live-model fixture, unrelated to this iteration). test_tscheck_shops_seeded_data.py expects 14 seeded shops but finds 15 (Chiswick seed-flag residue). Both explicitly called out as out-of-scope in spec_deviations."
+    }
+  ],
+  "retest_needed": true
+}

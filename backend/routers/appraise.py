@@ -7,6 +7,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 
 from lib.auth import require_session
+from lib.ai_quota import enforce_ai_quota
 from models.appraisal import AppraiseRequest, Appraisal
 
 router = APIRouter(tags=["appraise"])
@@ -88,7 +89,11 @@ def _b64(raw: str) -> str:
 
 
 @router.post("/appraise", response_model=Appraisal)
-async def appraise(body: AppraiseRequest, _: bool = Depends(require_session)):
+async def appraise(body: AppraiseRequest, session: dict = Depends(require_session)):
+    # Rate-limit before any work: Gemini is a billable, large (up to ~12 MB) third-party call,
+    # and the shop password is widely known inside the volunteer network, so an unmetered endpoint
+    # is a budget / DoS exposure. 429 is deliberately returned before the LLM request fires.
+    await enforce_ai_quota(session.get("username"))
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="AI key not configured")

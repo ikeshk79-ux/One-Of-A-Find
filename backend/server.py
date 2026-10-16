@@ -140,6 +140,13 @@ async def csrf_and_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
     response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    # Deny every powerful feature by default on API responses. The SPA layer sets its own
+    # policy for pages that legitimately need camera (for item capture) and clipboard.
+    response.headers["Permissions-Policy"] = (
+        "accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), "
+        "gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), "
+        "xr-spatial-tracking=(), interest-cohort=()"
+    )
     return response
 
 

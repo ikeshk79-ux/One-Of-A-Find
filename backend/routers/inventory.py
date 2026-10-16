@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from lib.auth import require_session
 from lib.activity import log_activity
+from lib.ai_quota import enforce_ai_quota
 from lib.db import db
 from lib.pricing import apply_adjustment
 from models.appraisal import (
@@ -328,6 +329,9 @@ async def update_item(item_id: str, body: ItemUpdate, session: dict = Depends(re
 @router.post("/{item_id}/blurb", response_model=InventoryItem)
 async def redraft_blurb(item_id: str, body: BlurbRequest, session: dict = Depends(require_session)):
     """Re-draft the item's resale listing in a chosen tone and persist it."""
+    # Shares the same AI quota bucket as /appraise so an attacker can't bypass by swapping
+    # endpoints — both count toward the same per-user daily cap.
+    await enforce_ai_quota(session.get("username"))
     doc = await db.inventory.find_one({"id": item_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Item not found")

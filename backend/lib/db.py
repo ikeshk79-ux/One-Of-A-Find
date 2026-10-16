@@ -41,6 +41,11 @@ INDEXES: dict[str, list[IndexModel]] = {
     # the current ruleset. Tiny today but the primary read path.
     "pricing_rules": [IndexModel([("version", DESCENDING)], name="version_desc")],
     "shops": [IndexModel([("id", ASCENDING)], name="id", unique=True)],
+    # ai_quota: TTL index so expired day-buckets drop automatically. Lookup by (username, bucket).
+    "ai_quota": [
+        IndexModel([("username", ASCENDING), ("bucket", ASCENDING)], name="user_bucket", unique=True),
+        IndexModel([("expires_at", ASCENDING)], name="expires_ttl", expireAfterSeconds=0),
+    ],
 }
 
 

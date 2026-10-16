@@ -120,6 +120,11 @@ async def delete_shop(
             target = await db.shops.find_one({"id": reassign_to})
             if not target:
                 raise HTTPException(status_code=404, detail="Target shop not found")
+            # Reject disabled targets: a merge should move the duplicate into an active branch,
+            # not revive items under a retired shop name. Admins can re-enable the target first
+            # if that is really what they intend.
+            if target.get("disabled"):
+                raise HTTPException(status_code=422, detail="Target shop is disabled — re-enable it before merging")
             inv_moved = await db.inventory.update_many(
                 {"location": doc["name"]}, {"$set": {"location": target["name"]}}
             )
