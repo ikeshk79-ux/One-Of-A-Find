@@ -1,0 +1,52 @@
+{
+  "iteration": 41,
+  "mode": "generate",
+  "summary": "Verified the Appraise error-surfacing bug fix (src/pages/Appraise.tsx onError + inline appraise-error banner). All 5 acceptance criteria covered with named browser checks mocking /api/appraise via page.route (no real Gemini quota burned). All checks passed, including one rerun against the public preview URL.",
+  "passed": 5,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "429 (daily AI quota) surfaces the quota detail, not 'try another photo'",
+      "name": "appraise-error-429-quota-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked /api/appraise -> 429 {detail:'Daily AI quota reached — try again tomorrow'}; appraise-error banner text exactly equals that string, toast [data-sonner-toast] contains same string; neither contains 'try another photo'. Re-ran successfully against public preview URL https://thrift-vision.preview.emergentagent.com."
+    },
+    {
+      "criterion": "429 (burst) surfaces the burst detail",
+      "name": "appraise-error-429-burst-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked /api/appraise -> 429 {detail:'Too many AI requests — please wait a moment'}; banner text exactly equals detail, toast carries same detail, neither mentions 'try another photo'."
+    },
+    {
+      "criterion": "413 (payload too large) does not tell user to try another photo",
+      "name": "appraise-error-413-payload-too-large",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked /api/appraise -> 413 {detail:'Request body too large'}; banner and toast both contain 'Request body too large' and neither contains 'try another photo'."
+    },
+    {
+      "criterion": "500 with detail is prefixed with 'Appraisal failed —'",
+      "name": "appraise-error-500-with-detail-prefixed",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked /api/appraise -> 500 {detail:'Could not parse appraisal'}; banner reads exactly 'Appraisal failed — Could not parse appraisal'; toast contains same prefixed string."
+    },
+    {
+      "criterion": "Network / missing detail falls back to the original generic message",
+      "name": "appraise-error-fallback-generic-message",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked /api/appraise -> 500 with empty text/plain body (no detail); banner reads exactly 'Appraisal failed — try another photo or hit Appraise item again.'; toast contains 'Appraisal failed — try another photo' (legacy unchanged behaviour)."
+    }
+  ],
+  "notes": [
+    "All 5 criteria are UI-facing and fully exercised via browser checks mocking the network response with page.route; no backend change in this iteration per spec_deviations, so no backend test files were needed.",
+    "Camera capture was simulated by overriding navigator.mediaDevices.getUserMedia via addInitScript to return a canvas.captureStream(), letting the real CameraCapture dialog (shutter -> use photo) populate itemImage in-app state without touching real hardware or Gemini quota.",
+    "Login used master / GXTJEpaiUUC_j_GVdldxvt-m via the 'unlock-manager-signin' -> username/pin flow from seed_facts."
+  ]
+}

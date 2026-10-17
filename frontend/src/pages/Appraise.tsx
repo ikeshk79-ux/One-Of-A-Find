@@ -27,7 +27,7 @@ import SuccessMoment from "@/components/common/SuccessMoment";
 import ValueDisplay from "@/components/common/ValueDisplay";
 import ConfidenceBadge from "@/components/common/ConfidenceBadge";
 import WhyThisEstimate from "@/components/common/WhyThisEstimate";
-import { apiPost } from "@/lib/api";
+import { ApiError, apiPost } from "@/lib/api";
 import { gbp, CATEGORIES, sizeOptionsFor, CONDITION_OPTIONS, CONDITION_MULTIPLIERS, adjustedCharityPrice } from "@/lib/types";
 import { useShopNames } from "@/hooks/useShops";
 import ZoneAdjustmentHint from "@/components/common/ZoneAdjustmentHint";
@@ -196,7 +196,25 @@ export default function Appraise() {
       setIsElectrical(Boolean(data.is_electrical));
       toast.success("Appraisal ready");
     },
-    onError: () => toast.error("Appraisal failed — try another photo"),
+    onError: (e: Error) => {
+      // Surface the backend detail so volunteers see "Daily AI quota reached" or "Request
+      // body too large" instead of a generic "try another photo" — the previous blanket error
+      // left users retrying a perfectly good photo for no reason.
+      const detail =
+        e instanceof ApiError
+          ? typeof (e.body as { detail?: unknown } | null)?.detail === "string"
+            ? ((e.body as { detail: string }).detail)
+            : null
+          : null;
+      // On 429 / 413 the photo isn't the problem — don't tell the user to try another one.
+      const generic =
+        e instanceof ApiError && (e.status === 429 || e.status === 413)
+          ? detail || "Appraisal unavailable right now"
+          : (detail
+              ? `Appraisal failed — ${detail}`
+              : "Appraisal failed — try another photo");
+      toast.error(generic);
+    },
   });
 
   const sizeOpts = sizeOptionsFor(category);
@@ -522,13 +540,27 @@ export default function Appraise() {
         </Button>
 
         {/* Inline error on Step 01 after an appraisal failure — the user is returned here so
-            they can retry a different photo without losing their inputs. */}
+            they can retry a different photo without losing their inputs. Shows the backend's
+            `detail` string when present (quota reached / body too large / parse error) so the
+            volunteer knows whether to retry or wait. */}
         {appraise.isError && (
           <p
             className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
             data-testid="appraise-error"
           >
-            Appraisal failed — try another photo or hit Appraise item again.
+            {(() => {
+              const e = appraise.error;
+              const detail =
+                e instanceof ApiError && typeof (e.body as { detail?: unknown } | null)?.detail === "string"
+                  ? ((e.body as { detail: string }).detail)
+                  : null;
+              if (e instanceof ApiError && (e.status === 429 || e.status === 413)) {
+                return detail || "Appraisal unavailable right now — please wait and retry.";
+              }
+              return detail
+                ? `Appraisal failed — ${detail}`
+                : "Appraisal failed — try another photo or hit Appraise item again.";
+            })()}
           </p>
         )}
 
