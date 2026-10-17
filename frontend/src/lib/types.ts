@@ -21,6 +21,11 @@ export interface InventoryItem extends Appraisal {
   sku: string;
   pat_passed: boolean; // true once an electrical item has passed its PAT safety test
   item_image: string | null;
+  /** Small ~5 KB JPEG thumbnail (160 px long-edge, q80) auto-generated server-side at upload.
+   * Shipped on the inventory list endpoint instead of the full item_image to keep the mobile
+   * payload compact — detail routes still return the full item_image. Null on legacy rows
+   * until the server-side backfill task catches up (sub-second after deploy). */
+  thumb_image: string | null;
   label_image: string | null;
   extra_images: string[];
   giftaid_ref: string | null;

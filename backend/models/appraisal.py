@@ -91,6 +91,9 @@ class InventoryItem(BaseModel):
     pat_passed: bool = False  # ticked once the electrical item has passed its PAT safety test
     price_source: str = "charity"  # how the tag price was chosen: "charity" | "peak" | "custom"
     item_image: str | None = None
+    # Small ~5 KB JPEG thumbnail (160 px long-edge, q80) auto-generated at upload. Shipped on
+    # the list endpoint instead of the full item_image to keep the mobile payload compact.
+    thumb_image: str | None = None
     label_image: str | None = None
     extra_images: list[str] = []
     giftaid_ref: str | None = None

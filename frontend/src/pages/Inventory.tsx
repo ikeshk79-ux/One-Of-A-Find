@@ -98,11 +98,16 @@ export default function Inventory() {
     retry: false,
   });
   const lightboxSource = expandFull ?? expandCard;
-  const lightboxImages = lightboxSource
-    ? [lightboxSource.item_image, lightboxSource.label_image, ...lightboxSource.extra_images].filter(
+  // Until the full item fetch returns, the list row only has `thumb_image` (list endpoint
+  // omits the full base64 photo for payload speed). Show the thumb as an instant placeholder,
+  // then flip to the full item_image + label + extras once /inventory/{id} resolves.
+  const lightboxImages = expandFull
+    ? [expandFull.item_image, expandFull.label_image, ...expandFull.extra_images].filter(
         (x): x is string => !!x,
       )
-    : [];
+    : lightboxSource?.thumb_image
+      ? [lightboxSource.thumb_image]
+      : [];
 
   const remove = useMutation({
     mutationFn: (id: string) => apiDelete<void>(`/inventory/${id}`),
@@ -379,10 +384,12 @@ export default function Inventory() {
               } ${selectMode && blocked ? "opacity-60" : ""}`}
             >
               <div className="relative h-36 overflow-hidden bg-obsidian">
-                {item.item_image ? (
+                {(item.thumb_image ?? item.item_image) ? (
                   <img
-                    src={item.item_image}
+                    src={item.thumb_image ?? item.item_image ?? ""}
                     alt={item.title}
+                    loading="lazy"
+                    decoding="async"
                     className={`size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${sold ? "opacity-45" : ""}`}
                   />
                 ) : (
@@ -423,7 +430,7 @@ export default function Inventory() {
                     <Check className="size-4" />
                   </span>
                 )}
-                {!selectMode && item.item_image && (
+                {!selectMode && (item.thumb_image ?? item.item_image) && (
                   <button
                     type="button"
                     data-testid={`enlarge-${item.id}`}

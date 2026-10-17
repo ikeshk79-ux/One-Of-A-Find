@@ -217,11 +217,12 @@ export default function Finds() {
                   className="card-elevated group flex h-full flex-col gap-3 rounded-2xl p-3 transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
                   <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-muted">
-                    {item.item_image ? (
+                    {(item.thumb_image ?? item.item_image) ? (
                       <img
-                        src={item.item_image}
+                        src={item.thumb_image ?? item.item_image ?? ""}
                         alt=""
                         loading="lazy"
+                        decoding="async"
                         className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                     ) : (

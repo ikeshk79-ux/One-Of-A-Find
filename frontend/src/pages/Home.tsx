@@ -191,12 +191,13 @@ export default function Home() {
                   className="card-elevated group flex items-center gap-4 rounded-2xl p-3 transition-all hover:-translate-y-0.5"
                 >
                   <div className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-muted">
-                    {item.item_image ? (
+                    {(item.thumb_image ?? item.item_image) ? (
                       <img
-                        src={item.item_image}
+                        src={item.thumb_image ?? item.item_image ?? ""}
                         alt=""
                         className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
+                        decoding="async"
                       />
                     ) : (
                       <div className="grid size-full place-items-center text-muted-foreground">

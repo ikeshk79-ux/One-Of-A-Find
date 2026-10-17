@@ -8,6 +8,7 @@ from lib.auth import require_session
 from lib.activity import log_activity
 from lib.ai_quota import enforce_ai_quota
 from lib.db import db
+from lib.thumbs import make_thumb
 from lib.pricing import apply_adjustment
 from models.appraisal import (
     BlurbRequest,
@@ -76,9 +77,9 @@ def _week_start() -> datetime:
 async def list_items(session: dict = Depends(require_session)):
     # Trim heavy fields the grid never shows (label + detail photos); the detail page fetches the full doc.
     docs = (
-        await db.inventory.find({}, {"label_image": 0, "extra_images": 0})
+        await db.inventory.find({}, {"item_image": 0, "label_image": 0, "extra_images": 0})
         .sort("created_at", -1)
-        .to_list(500)
+        .to_list(2500)
     )
     return [_redact(InventoryItem(**_aware(d)), session) for d in docs]
 
@@ -171,6 +172,8 @@ async def create_item(body: InventoryCreate, session: dict = Depends(require_ses
     item = InventoryItem(
         sku=await _unique_sku(),
         item_image=body.item_image,
+        # Generate the list-view thumbnail now so the grid never ships the full image.
+        thumb_image=make_thumb(body.item_image),
         label_image=body.label_image,
         extra_images=body.extra_images,
         giftaid_ref=giftaid,

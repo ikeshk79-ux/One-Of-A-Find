@@ -221,8 +221,8 @@ export default function QuickFind({
                 )}
               >
                 <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
-                  {item.item_image ? (
-                    <img src={item.item_image} alt="" loading="lazy" className="size-full object-cover" />
+                  {(item.thumb_image ?? item.item_image) ? (
+                    <img src={item.thumb_image ?? item.item_image ?? ""} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                   ) : (
                     <Package className="size-4 text-muted-foreground" />
                   )}

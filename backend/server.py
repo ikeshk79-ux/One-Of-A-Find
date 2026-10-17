@@ -16,6 +16,7 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, ensure_indexes
 from lib.auth import seed_master
+from lib.thumbs_backfill import backfill_thumbs
 from seed_shops import seed as seed_shops
 
 
@@ -31,8 +32,19 @@ async def lifespan(app: FastAPI):
         await seed_shops()
     except Exception as e:  # noqa: BLE001 — never block boot on a seed hiccup
         logging.getLogger(__name__).warning("shops seed skipped: %s", e)
+    # Generate thumbnails for any legacy rows missing one. Runs in the background so a cold boot
+    # on a 2000-row collection doesn't block FastAPI startup — the list endpoint falls back to
+    # item_image until the backfill catches up for that row.
+    app.state.thumbs_backfill = asyncio.create_task(_safe_backfill_thumbs())
     yield
     client.close()
+
+
+async def _safe_backfill_thumbs() -> None:
+    try:
+        await backfill_thumbs()
+    except Exception as e:  # noqa: BLE001 — a backfill hiccup must not take down a running pod
+        logging.getLogger(__name__).warning("thumbs backfill aborted: %s", e)
 
 
 # Create the main app without a prefix
