@@ -1,0 +1,39 @@
+{
+  "iteration": 40,
+  "mode": "retest",
+  "scope": "Lean regression sanity check (4th identical external-tool code-review forward). Confirm toast-duration fix from iteration_39 hasn't drifted; re-verify prior false-positive conclusions via repo's own analysers.",
+  "summary": "Re-ran the 3 named browser checks from iteration_39 covering this briefing's matrix. All 3 PASSED with no code changes. No new criteria requiring new artifacts. No tscheck-* fixture rows exist (these are pure client-side toast probes with no DB writes) so no cleanup was needed.",
+  "passed": 3,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Global toast default remains 1800 ms",
+      "name": "toast-default-duration-signed-in",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Real 'Signed in' toast on login (no explicit duration) was visible for 2384ms -- within the expected ~1800ms+exit-animation window and well under sonner's 4000ms default / the 2500ms bound in this briefing."
+    },
+    {
+      "criterion": "Explicit per-call duration still overrides",
+      "name": "toast-explicit-duration-overrides-default",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "toast.success('tscheck-override-toast', { duration: 5000 }) remained visible past 3000ms from fire time, confirming per-call duration overrides the 1800ms global default."
+    },
+    {
+      "criterion": "Mobile offset keeps toasts above the bottom nav",
+      "name": "toast-mobile-offset-above-bottom-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844 viewport, toast bottom edge sits 72px above viewport bottom (clearanceFromBottom=72, >=60 required), flush with (not overlapping) the BottomNavigation top edge (clearanceFromNavTop=0)."
+    }
+  ],
+  "notes": [
+    "Repeat of iterations 25/36/38/39's conclusion: the forwarded external-tool code-review report's 'critical' items remain documented false positives (hook-dep lint rule flagging non-reactive values/refs/constants; unreproducible 'undefined vars'; PEP-8-correct is True/False/None; intentional CSRF sessionStorage pattern; large files previously deferred).",
+    "No application code was modified this iteration. No new UI-facing or API-bearing criteria were introduced beyond the 3 already covered by iteration_39's artifacts, so no new check or test file was added.",
+    "No tscheck-* database rows were seeded or needed cleanup -- the toast checks are pure client-side timing/positioning probes."
+  ]
+}
