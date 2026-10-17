@@ -28,6 +28,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // bottom-anchored toast would otherwise cover — raise toasts above it so volunteers can
       // still reach the Home/Finds/More tabs while a confirmation is on screen.
       mobileOffset={{ bottom: "calc(72px + env(safe-area-inset-bottom, 0px))", right: "12px", left: "12px" }}
+      // Default visible duration (ms). Sonner's own default is 4s which lingers on
+      // confirmation-style toasts ("Photo captured", "Saved to Finds") that volunteers glance
+      // at once and move on from. 1.8s is long enough to read a 2-3 word confirmation and short
+      // enough to not overlap the next step. Individual callers can override by passing
+      // `{ duration: Nms }` on toast.success/error/info.
+      duration={1800}
       className="toaster group"
       icons={{
         success: (

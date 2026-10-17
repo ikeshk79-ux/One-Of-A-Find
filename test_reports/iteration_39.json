@@ -1,0 +1,61 @@
+{
+  "iteration": 39,
+  "mode": "generate",
+  "scope": "Verify one-line fix in src/components/ui/sonner.tsx: duration={1800} global Sonner Toaster default",
+  "summary": "All 5 acceptance criteria verified with 6 browser checks (5 on localhost + 1 cross-check on the public preview URL). No backend artifacts needed -- the fix is pure UI/toast-timing behavior with no API surface.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Global toast default is 1800ms (not sonner's 4000ms)",
+      "name": "toast-default-duration-signed-in",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Real 'Signed in' toast fired on login (no explicit duration) was visible for 2406ms -- well short of sonner's 4000ms default, consistent with the new 1800ms base plus exit-animation slack. Screenshot captured."
+    },
+    {
+      "criterion": "Global toast default is 1800ms (not sonner's 4000ms) -- public preview ingress cross-check",
+      "name": "toast-default-duration-signed-in-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same probe run against https://thrift-vision.preview.emergentagent.com: visibleMs=2369, within 1000-3500ms bound."
+    },
+    {
+      "criterion": "Scan page 'Photo captured' toast auto-dismisses quickly",
+      "name": "scan-photo-captured-toast-dismisses-quickly",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Real camera capture is infeasible headless (CameraCapture.tsx's getUserMedia() throws -> 'denied' state, manually confirmed via screenshot: 'No camera available, or access was blocked'). Fired the app's exact toast.success('Photo captured') call (from Appraise.tsx's onCapture handler) via the same Vite-optimized-deps sonner module instance while parked on the Scan page: appeared within 10ms, total lifetime 2357ms (<2500ms). This is a documented proxy per the briefing's fallback guidance, not a full camera-hardware test."
+    },
+    {
+      "criterion": "Explicit per-call duration still overrides the default",
+      "name": "toast-explicit-duration-overrides-default",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "toast.success('tscheck-override-toast', { duration: 5000 }) fired via page.evaluate (per briefing) remained visible past 3000ms from fire time, proving per-call duration overrides the 1800ms global default."
+    },
+    {
+      "criterion": "Error toasts also follow the shorter default",
+      "name": "toast-error-default-duration",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Real error toast triggered via wrong-PIN sign-in attempt (Lock.tsx auth.onError -> toast.error with no duration override, text 'Incorrect username or PIN'): lifetime 2335ms (<2500ms)."
+    },
+    {
+      "criterion": "Mobile offset still raises toasts above the bottom nav",
+      "name": "toast-mobile-offset-above-bottom-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390x844 viewport, after the entrance transition settles (verified transform: matrix(1,0,0,1,0,0)), the 'Signed in' toast's bottom edge sits exactly 72px above the viewport bottom (clearanceFromBottom=72, >=60 required) and flush with -- not overlapping -- the BottomNavigation top edge (clearanceFromNavTop=0). Note: measuring mid-entrance-animation (before the ~400ms CSS transition settles) falsely shows ~22-26px clearance / a ~46px nav overlap; this is an animation-timing artifact in the measurement, not a product bug -- confirmed by re-measuring after the transform settles to identity."
+    }
+  ],
+  "notes": [
+    "Backend lane not applicable: the fix (duration={1800} on the Sonner Toaster) is pure frontend toast-timing/positioning behavior with no API surface; no backend test file was warranted.",
+    "Camera capture could not be exercised end-to-end in this headless environment (no fake media device wired into the browser launch args available to this tool). The 'Photo captured' check instead fires the exact production toast.success call via the app's live sonner module instance, which is an explicitly sanctioned fallback per the briefing.",
+    "No application code was modified. Six check artifacts live under /app/.emergent/scripts/checks/: toast-default-duration-signed-in(.mjs), toast-default-duration-signed-in-preview(.mjs), scan-photo-captured-toast-dismisses-quickly(.mjs), toast-explicit-duration-overrides-default(.mjs), toast-error-default-duration(.mjs), toast-mobile-offset-above-bottom-nav(.mjs). A transient debug-only check (toast-mobile-offset-debug) used to diagnose the animation-timing artifact was deleted before finishing -- no scratch/backup files left behind.",
+    "No fixture rows were created in the database by any of these checks (pure client-side toast/timing probes); nothing to clean up server-side."
+  ]
+}
