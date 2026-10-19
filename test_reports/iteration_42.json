@@ -1,0 +1,54 @@
+{
+  "iteration": 42,
+  "mode": "generate",
+  "summary": "Verified BarcodeScanner.tsx bug fix (environment-facing camera, DOMException mapping, 8s stuck-timer, manual SKU fallback). All 6 acceptance criteria exercised with named browser checks; all passed, including a re-run against the public preview URL confirming the fix is live there too.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Barcode scanner uses facingMode:environment constraint",
+      "name": "scanner-facingmode-environment",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed navigator.mediaDevices.getUserMedia via addInitScript before navigation; logged in as master, opened /inventory, clicked scan-button, captured constraints passed to getUserMedia: video.facingMode.ideal === 'environment' and audio === false. Confirmed both on localhost and re-run against https://thrift-vision.preview.emergentagent.com."
+    },
+    {
+      "criterion": "Scanner shows the specific permission-denied message on NotAllowedError",
+      "name": "scanner-notallowed-permission-denied",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia to reject with DOMException('denied','NotAllowedError'); [data-testid=scanner-error] text contained 'Camera permission denied' and did NOT contain the generic 'Camera unavailable' fallback."
+    },
+    {
+      "criterion": "Scanner shows the no-back-camera message on NotFoundError",
+      "name": "scanner-notfound-no-back-camera",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia to reject with DOMException('missing','NotFoundError'); scanner-error text contained 'No back camera found'."
+    },
+    {
+      "criterion": "Scanner shows the in-use message on NotReadableError",
+      "name": "scanner-notreadable-in-use",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia to reject with DOMException('busy','NotReadableError'); scanner-error text contained 'in use by another app'."
+    },
+    {
+      "criterion": "Stuck-start timeout flips to error after ~8s if getUserMedia never resolves",
+      "name": "scanner-stuck-timeout-flips-to-error",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia to return a never-resolving Promise; [data-testid=scanner-error] appeared within the 10s wait window with text containing \"Camera didn't start\"."
+    },
+    {
+      "criterion": "Manual SKU entry still works even when the camera is stuck/denied",
+      "name": "scanner-manual-sku-entry-works-when-camera-denied",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "With getUserMedia stubbed to reject (NotAllowedError), typed a 12-digit SKU into manual-sku-input and clicked manual-sku-submit; onDetected fired through to resolveScannedCode (visible 404 network call in console), surfacing the 'No item matches that barcode' toast — confirms the manual path is reachable independent of camera state."
+    }
+  ]
+}

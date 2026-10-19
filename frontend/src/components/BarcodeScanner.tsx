@@ -24,6 +24,7 @@ export default function BarcodeScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const [status, setStatus] = useState<"starting" | "scanning" | "error">("starting");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [manual, setManual] = useState("");
 
   useEffect(() => {
@@ -31,12 +32,31 @@ export default function BarcodeScanner({
     let cancelled = false;
     let handled = false;
     setStatus("starting");
+    setErrorMessage("");
     setManual("");
+
+    // Fallback timeout: if neither the resolved-controls callback nor an error fires within
+    // 8 seconds the camera is wedged (common on mobile when the permission prompt is dismissed
+    // or when a different app has the camera). Flip to the error state so the user can type the
+    // SKU instead of staring at a spinner.
+    const stuckTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setStatus((s) => (s === "starting" ? "error" : s));
+      setErrorMessage((m) => m || "Camera didn't start — grant camera permission or type the SKU below.");
+    }, 8000);
+
     const reader = new BrowserMultiFormatReader();
+    // Prefer the back camera on phones (facingMode: environment). Without this, zxing's default
+    // `decodeFromVideoDevice(undefined, …)` often picks the front camera (or on Android picks a
+    // random one), which looked to the user like "the camera isn't activated" — the stream was
+    // live but pointing the wrong way at a dark lens cover.
+    const constraints: MediaStreamConstraints = {
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    };
 
     reader
-      .decodeFromVideoDevice(undefined, videoRef.current ?? undefined, (result) => {
-        // zxing fires per decoded frame — guard so only the first detection is acted on.
+      .decodeFromConstraints(constraints, videoRef.current ?? undefined, (result) => {
         if (result && !cancelled && !handled) {
           handled = true;
           onDetected(result.getText());
@@ -48,12 +68,30 @@ export default function BarcodeScanner({
           return;
         }
         controlsRef.current = controls;
+        // iOS Safari needs an explicit play() after srcObject is set — zxing handles this but
+        // some WKWebView wrappers do not; a redundant call is cheap and never hurts.
+        void videoRef.current?.play().catch(() => undefined);
         setStatus("scanning");
       })
-      .catch(() => !cancelled && setStatus("error"));
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (import.meta.env.DEV) console.warn("barcode scanner start failed:", err);
+        setStatus("error");
+        const name = err instanceof Error ? err.name : "";
+        if (name === "NotAllowedError") {
+          setErrorMessage("Camera permission denied — allow it in your browser settings or type the SKU below.");
+        } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+          setErrorMessage("No back camera found on this device — type the SKU below.");
+        } else if (name === "NotReadableError") {
+          setErrorMessage("Camera is in use by another app — close it and try again.");
+        } else {
+          setErrorMessage("Camera unavailable — type the SKU below instead.");
+        }
+      });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(stuckTimer);
       controlsRef.current?.stop();
       controlsRef.current = null;
     };
@@ -74,6 +112,7 @@ export default function BarcodeScanner({
             ref={videoRef}
             playsInline
             muted
+            autoPlay
             data-testid="scanner-video"
             className={`size-full object-cover ${status === "scanning" ? "" : "invisible"}`}
           />
@@ -87,11 +126,11 @@ export default function BarcodeScanner({
           )}
           {status === "error" && (
             <div
-              className="absolute inset-0 grid place-items-center gap-2 p-8 text-center text-sm text-muted-foreground"
+              className="absolute inset-0 grid place-items-center gap-2 p-6 text-center text-sm text-muted-foreground"
               data-testid="scanner-error"
             >
               <ScanLine className="mx-auto size-6 text-gold/70" />
-              Camera unavailable — type the SKU below instead.
+              {errorMessage || "Camera unavailable — type the SKU below instead."}
             </div>
           )}
         </div>
