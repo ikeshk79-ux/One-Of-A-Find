@@ -388,7 +388,11 @@ independent of the session branch.
    optional Gift Aid reference field, plus Category and Shop location dropdowns
    (location = alphabetical branch list) -> Save & make tag.
 2. `/inventory` — stats header; "Scan tag" barcode scanner (parses either a QR /tag/<id>?ga= URL
-   or a "SKU*GIFTAID" CODE128 payload) that opens the item; search + category dropdown + sort
+   or a "SKU*GIFTAID" CODE128 payload) that opens the item. `BarcodeScanner` drives the camera with
+   direct `navigator.mediaDevices.getUserMedia` (same pattern as `CameraCapture`) and decodes frames
+   itself on an offscreen canvas via zxing's `decodeFromCanvas` every ~220ms; the `<video>` stays
+   mounted and visible for the dialog's lifetime (hiding it suspends frame delivery on mobile Chrome)
+   with spinner/error overlays stacked on top, plus a "Try again" retry and a manual-SKU fallback; search + category dropdown + sort
    (newest / price high→low / price low→high / category) + availability toggle; card click → /tag/:id.
    Each card has a corner expand icon (`enlarge-{id}`) that opens `ImageLightbox` — a zoomable photo
    viewer (all of the item's photos: main + label + detail shots, fetched full on demand via

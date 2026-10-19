@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-import { Loader2, ScanLine, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { Loader2, RefreshCw, ScanLine, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const DECODE_INTERVAL_MS = 220;
+
 export default function BarcodeScanner({
   open,
   onClose,
@@ -22,80 +24,104 @@ export default function BarcodeScanner({
   onDetected: (sku: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const controlsRef = useRef<IScannerControls | null>(null);
-  const [status, setStatus] = useState<"starting" | "scanning" | "error">("starting");
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const handledRef = useRef(false);
+  // Keep the callback in a ref so re-renders of the parent never tear down a live stream.
+  const onDetectedRef = useRef(onDetected);
+  onDetectedRef.current = onDetected;
+
+  const [status, setStatus] = useState<"idle" | "starting" | "scanning" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [manual, setManual] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    let handled = false;
+  const stop = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  const start = useCallback(async () => {
+    handledRef.current = false;
     setStatus("starting");
     setErrorMessage("");
-    setManual("");
-
-    // Fallback timeout: if neither the resolved-controls callback nor an error fires within
-    // 8 seconds the camera is wedged (common on mobile when the permission prompt is dismissed
-    // or when a different app has the camera). Flip to the error state so the user can type the
-    // SKU instead of staring at a spinner.
-    const stuckTimer = window.setTimeout(() => {
-      if (cancelled) return;
-      setStatus((s) => (s === "starting" ? "error" : s));
-      setErrorMessage((m) => m || "Camera didn't start — grant camera permission or type the SKU below.");
-    }, 8000);
-
-    const reader = new BrowserMultiFormatReader();
-    // Prefer the back camera on phones (facingMode: environment). Without this, zxing's default
-    // `decodeFromVideoDevice(undefined, …)` often picks the front camera (or on Android picks a
-    // random one), which looked to the user like "the camera isn't activated" — the stream was
-    // live but pointing the wrong way at a dark lens cover.
-    const constraints: MediaStreamConstraints = {
-      video: { facingMode: { ideal: "environment" } },
-      audio: false,
-    };
-
-    reader
-      .decodeFromConstraints(constraints, videoRef.current ?? undefined, (result) => {
-        if (result && !cancelled && !handled) {
-          handled = true;
-          onDetected(result.getText());
-        }
-      })
-      .then((controls) => {
-        if (cancelled) {
-          controls.stop();
-          return;
-        }
-        controlsRef.current = controls;
-        // iOS Safari needs an explicit play() after srcObject is set — zxing handles this but
-        // some WKWebView wrappers do not; a redundant call is cheap and never hurts.
-        void videoRef.current?.play().catch(() => undefined);
-        setStatus("scanning");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (import.meta.env.DEV) console.warn("barcode scanner start failed:", err);
-        setStatus("error");
-        const name = err instanceof Error ? err.name : "";
-        if (name === "NotAllowedError") {
-          setErrorMessage("Camera permission denied — allow it in your browser settings or type the SKU below.");
-        } else if (name === "NotFoundError" || name === "OverconstrainedError") {
-          setErrorMessage("No back camera found on this device — type the SKU below.");
-        } else if (name === "NotReadableError") {
-          setErrorMessage("Camera is in use by another app — close it and try again.");
-        } else {
-          setErrorMessage("Camera unavailable — type the SKU below instead.");
-        }
+    try {
+      // Direct getUserMedia (same pattern as CameraCapture) instead of zxing's device wrapper:
+      // zxing's auto-play path never pumped frames once React toggled the video's visibility,
+      // which showed as a live camera indicator over a blank frame on mobile Chrome.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+        audio: false,
       });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (!video) {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        return;
+      }
+      video.srcObject = stream;
+      await video.play().catch(() => undefined);
+      setStatus("scanning");
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(stuckTimer);
-      controlsRef.current?.stop();
-      controlsRef.current = null;
-    };
-  }, [open, onDetected]);
+      // Manual decode loop: grab the current frame onto an offscreen canvas and hand it to zxing.
+      const reader = new BrowserMultiFormatReader();
+      const canvas = canvasRef.current ?? document.createElement("canvas");
+      canvasRef.current = canvas;
+      timerRef.current = window.setInterval(() => {
+        const v = videoRef.current;
+        if (!v || !v.videoWidth || handledRef.current) return;
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        try {
+          const result = reader.decodeFromCanvas(canvas);
+          const text = result?.getText();
+          if (text && !handledRef.current) {
+            handledRef.current = true;
+            onDetectedRef.current(text);
+          }
+        } catch {
+          // NotFoundException on every frame without a barcode — expected, keep scanning.
+        }
+      }, DECODE_INTERVAL_MS);
+    } catch (err: unknown) {
+      if (import.meta.env.DEV) console.warn("barcode scanner start failed:", err);
+      setStatus("error");
+      const name = err instanceof Error ? err.name : "";
+      if (name === "NotAllowedError") {
+        setErrorMessage("Camera permission denied — allow it in your browser settings or type the SKU below.");
+      } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+        setErrorMessage("No camera found on this device — type the SKU below.");
+      } else if (name === "NotReadableError") {
+        setErrorMessage("Camera is in use by another app — close it and try again.");
+      } else {
+        setErrorMessage("Camera unavailable — type the SKU below instead.");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      setManual("");
+      void start();
+    } else {
+      stop();
+      setStatus("idle");
+    }
+    return stop;
+  }, [open, start, stop]);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -108,29 +134,40 @@ export default function BarcodeScanner({
         </DialogHeader>
 
         <div className="relative aspect-4/3 w-full overflow-hidden rounded-lg border border-hairline bg-obsidian">
+          {/* The video element stays mounted and visible for the whole dialog lifetime — hiding it
+              (visibility/display) suspends frame delivery on mobile Chrome. Overlays sit on top. */}
           <video
             ref={videoRef}
             playsInline
             muted
             autoPlay
             data-testid="scanner-video"
-            className={`size-full object-cover ${status === "scanning" ? "" : "invisible"}`}
+            className="size-full object-cover"
           />
           {status === "scanning" && (
             <div className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-gold/70 shadow-[0_0_12px_rgba(217,180,143,0.8)]" />
           )}
           {status === "starting" && (
-            <div className="absolute inset-0 grid place-items-center text-muted-foreground">
+            <div className="absolute inset-0 grid place-items-center bg-obsidian text-muted-foreground">
               <Loader2 className="size-6 animate-spin text-gold" />
             </div>
           )}
           {status === "error" && (
             <div
-              className="absolute inset-0 grid place-items-center gap-2 p-6 text-center text-sm text-muted-foreground"
+              className="absolute inset-0 grid place-items-center gap-3 bg-obsidian p-6 text-center text-sm text-muted-foreground"
               data-testid="scanner-error"
             >
               <ScanLine className="mx-auto size-6 text-gold/70" />
               {errorMessage || "Camera unavailable — type the SKU below instead."}
+              <button
+                type="button"
+                data-testid="scanner-retry"
+                onClick={() => void start()}
+                className="mx-auto inline-flex items-center gap-2 rounded-full border border-hairline bg-charcoal px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-gold/60 hover:text-gold"
+              >
+                <RefreshCw className="size-4" />
+                Try again
+              </button>
             </div>
           )}
         </div>

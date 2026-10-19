@@ -1,0 +1,47 @@
+{
+  "iteration": 43,
+  "mode": "generate",
+  "summary": "Verified the BarcodeScanner.tsx rewrite (direct getUserMedia + manual canvas decode loop replacing the zxing device wrapper) against all 5 acceptance criteria. All checks passed, including a rerun against the public preview URL. Note: this pod's Chromium actually serves a fake synthetic camera stream (green test pattern) via getUserMedia rather than rejecting outright, so the 'no camera' / graceful-degrade criterion was exercised by stubbing getUserMedia to reject with NotFoundError, matching the spec_deviations note that automated runs should see the error/manual-entry state.",
+  "passed": 5,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Scan tag dialog opens from the Inventory page and the camera video element stays mounted and visible (never hidden) while the dialog is open",
+      "name": "scanner-dialog-video-stays-visible",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Logged in as master, opened /inventory, clicked scan-button; scanner-dialog visible, scanner-video visible with computed visibility 'visible' and display not 'none', confirmed again via expect.poll after dialog settled."
+    },
+    {
+      "criterion": "With no camera available in the pod, the scanner degrades gracefully instead of hanging on a spinner",
+      "name": "scanner-no-camera-graceful-degrade",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia to reject with DOMException NotFoundError; scanner-error overlay appeared within ~171ms (well under 5s) with text 'No camera found on this device — type the SKU below.' plus a visible scanner-retry button; zero console errors captured. Re-ran against https://thrift-vision.preview.emergentagent.com with identical result (102ms)."
+    },
+    {
+      "criterion": "Manual SKU fallback still resolves an item",
+      "name": "scanner-manual-sku-resolves-existing-item",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened scanner on /inventory, typed seeded barcode 966971191267 (from GET /api/inventory) into manual-sku-input, submitted: scanner-dialog closed and tag-title showed 'Brook Taverner Men's Suit'. Re-opened scanner, typed bogus SKU 999999999999, got the 'No item matches that barcode' toast (backend 404 confirmed in console) with scanner staying usable."
+    },
+    {
+      "criterion": "QuickFind scan entry point (search bar scan icon, reachable from Home) opens the same scanner without console errors",
+      "name": "quickfind-scan-opens-same-scanner-graceful",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "From Home, clicked home-find-scan-button; scanner-dialog opened with scanner-video present, scanner-error overlay (no-camera stub) and manual-sku-input both visible/usable; consoleErrors array was empty."
+    },
+    {
+      "criterion": "Closing the scanner releases the camera and does not leave a running decode loop",
+      "name": "scanner-close-releases-camera-reopen-works",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia to return a fake MediaStream whose track.stop() increments a page-exposed counter. Opened scanner, clicked scanner-close -> dialog count 0 and stopCount became >0 (track.stop() called). Re-clicked scan-button -> exactly one scanner-dialog reappeared (toHaveCount(1)), then closed again cleanly; final stopCount=2, zero console errors."
+    }
+  ]
+}
