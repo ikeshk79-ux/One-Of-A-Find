@@ -1,0 +1,87 @@
+{
+  "iteration": 45,
+  "mode": "retest",
+  "summary": "Retest of BarcodeScanner.tsx re-arm/debounce fix + regression suite (tag design, print-tags, admin audit CSV). All 9 checks passed (2 new browser checks + 1 new backend test file + 2 new backend tests for audit.csv, 6 re-run existing artifacts). Backend suite has 1 pre-existing data-state failure (shops_seeded needs_zone_review) unrelated to this iteration's change.",
+  "passed": 9,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Scanner re-arms after a non-matching camera decode so the next barcode still fires onDetected",
+      "name": "scanner-rearms-after-nonmatch-decode",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Stubbed getUserMedia + patched BrowserMultiFormatReader.prototype.decodeFromCanvas (first call -> bogus text, subsequent calls -> seeded SKU). Toast 'No item matches that barcode' shown, scanner-dialog stayed open; within ~1.7s the next decode fired onDetected again, closed the dialog and navigated to /tag/{seeded_item_id}, tag-title matched. Only console error was the expected 404 from the bogus-SKU lookup."
+    },
+    {
+      "criterion": "Repeated decode of the SAME barcode within the cooldown window fires onDetected exactly once (debounce)",
+      "name": "scanner-debounces-duplicate-decode",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "decodeFromCanvas patched to always return the seeded SKU; counted /api/inventory/lookup requests for that SKU via page.on('request') — exactly 1 call, single navigation to /tag/{id}, scanner-dialog closed once, no re-fire."
+    },
+    {
+      "criterion": "Previous suite still passes: tag design (no QR, sticker outline, charity line, CONDITION above price, RRP under price, condition wraps not overlaps)",
+      "name": "tag-page-new-design-no-qr",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check: no QR code rendered on /tag/{id}, sticker outline + charity copy present."
+    },
+    {
+      "criterion": "Previous suite still passes: price block layout (CONDITION above price, RRP under price)",
+      "name": "tag-page-price-block-condition-rrp-layout",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check: layout order confirmed for both RRP-present and RRP-absent cases."
+    },
+    {
+      "criterion": "Previous suite still passes: print-tags PDF content (A6/A7/A8) contains CONDITION:/price/RRP, no QR, no 'all proceeds to the shop'",
+      "name": "print-tags-a6-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "PDF text extracted: 'CONDITION: Good PRICE £15.00 RRP £80.00 All proceeds go to charity' — matches expected copy, no QR."
+    },
+    {
+      "criterion": "Previous suite still passes: print-tags PDF content A7",
+      "name": "print-tags-a7-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "PDF text extracted with CONDITION:/PRICE/RRP/charity line present for A7 sheet."
+    },
+    {
+      "criterion": "Previous suite still passes: print-tags PDF content A8",
+      "name": "print-tags-a8-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "PDF text extracted with CONDITION:/PRICE/RRP/charity line present for A8 sheet (16 tiles)."
+    },
+    {
+      "criterion": "Previous suite still passes: scanner close releases camera, reopen works",
+      "name": "scanner-close-releases-camera-reopen-works",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "stopCount=2 (stream stopped on close, started again on reopen), consoleErrors=[]."
+    },
+    {
+      "criterion": "Admin audit CSV download still returns 200 (CSRF-key regression fix)",
+      "name": "admin-audit-csv-export-downloads",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Clicked admin-audit-csv button as master; Playwright download event fired with suggestedFilename matching pricing-audit-*.csv, no console error."
+    },
+    {
+      "criterion": "Admin audit CSV download still returns 200 (CSRF-key regression fix) — API",
+      "name": "test_tscheck_audit_csv_download.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/pricing/audit.csv as master_client -> 200, content-type contains 'csv', body is comma-delimited. Same route as volunteer_client -> 401/403 (role-gated)."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, out-of-scope: backend test_tscheck_shops_seeded_data.py::test_shops_seeded_with_14_known_branches fails (Chiswick High Road needs_zone_review expected True, got False) — a seeded-data mismatch unrelated to the BarcodeScanner.tsx change under test; not newly introduced by this iteration. test_tscheck_ai_quota_indexes.py and two appraise/ai-quota tests failed once on the full run due to 'Event loop is closed' (xdist worker teardown) and a real-model appraise call, and passed individually on rerun — classified flaky/environment, not a regression from this change."
+  ]
+}

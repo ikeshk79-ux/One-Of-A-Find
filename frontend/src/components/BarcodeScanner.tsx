@@ -28,6 +28,11 @@ export default function BarcodeScanner({
   const timerRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handledRef = useRef(false);
+  // Cooldown timer re-arms `handledRef` after each detection so the scanner can read the next
+  // tag without the dialog being closed and reopened. Needed because the parent only closes the
+  // dialog on a *resolved* scan — a 404 ("No item matches that barcode") toasts and leaves the
+  // scanner open, previously stalling the decode loop forever (handledRef stuck true).
+  const rearmTimerRef = useRef<number | null>(null);
   // Keep the callback in a ref so re-renders of the parent never tear down a live stream.
   const onDetectedRef = useRef(onDetected);
   onDetectedRef.current = onDetected;
@@ -41,6 +46,10 @@ export default function BarcodeScanner({
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (rearmTimerRef.current !== null) {
+      window.clearTimeout(rearmTimerRef.current);
+      rearmTimerRef.current = null;
+    }
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -48,6 +57,10 @@ export default function BarcodeScanner({
 
   const start = useCallback(async () => {
     handledRef.current = false;
+    if (rearmTimerRef.current !== null) {
+      window.clearTimeout(rearmTimerRef.current);
+      rearmTimerRef.current = null;
+    }
     setStatus("starting");
     setErrorMessage("");
     try {
@@ -91,6 +104,14 @@ export default function BarcodeScanner({
           if (text && !handledRef.current) {
             handledRef.current = true;
             onDetectedRef.current(text);
+            // Debounce + re-arm: block decoding for ~1.5s so a steady camera doesn't fire the
+            // same barcode dozens of times, then re-arm so the next tag (even if the parent kept
+            // the dialog open after a 404) is still readable without a manual close + reopen.
+            if (rearmTimerRef.current !== null) window.clearTimeout(rearmTimerRef.current);
+            rearmTimerRef.current = window.setTimeout(() => {
+              handledRef.current = false;
+              rearmTimerRef.current = null;
+            }, 1500);
           }
         } catch {
           // NotFoundException on every frame without a barcode — expected, keep scanning.
