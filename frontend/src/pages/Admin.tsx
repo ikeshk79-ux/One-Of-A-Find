@@ -538,12 +538,13 @@ function AuditSection() {
   const downloadCsv = async () => {
     try {
       // apiGet forces JSON parsing — hit fetch directly so the browser can save the CSV body.
+      // apiGet forces JSON parsing — hit fetch directly so the browser can save the CSV body.
+      // GET requests skip CSRF server-side (the middleware only enforces it on state-changing
+      // verbs), so we don't need to attach a token here. The earlier code read the token from
+      // the wrong sessionStorage key ("csrfToken" vs the real "ooaf_csrf"), which silently sent
+      // an empty header — harmless on this GET endpoint, but a trap if the route ever moves.
       const res = await fetch("/api/pricing/audit.csv", {
-        credentials: "include",
-        headers: {
-          "X-CSRF-Token":
-            sessionStorage.getItem("csrfToken") ?? "",
-        },
+        credentials: "same-origin",
       });
       if (!res.ok) throw new Error(`CSV download failed (${res.status})`);
       const blob = await res.blob();
