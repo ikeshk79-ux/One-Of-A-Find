@@ -1,0 +1,59 @@
+{
+  "iteration": 44,
+  "mode": "generate",
+  "summary": "Verified the PriceTag.tsx/pdfTags.ts new-design rewrite (QR removed, dashed sticker-area outline, 'All proceeds go to charity' wording, A8 stacked no-barcode layout) against all 6 acceptance criteria via fresh named browser checks. Backend suite was run as a baseline; 5 pre-existing failures found are unrelated to this iteration's scope (shop zone-review seed data and ai_quota index/event-loop infra flakiness) and are noted as out-of-scope/not introduced by PriceTag/pdfTags changes.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "note",
+      "detail": "Backend pytest suite (pre-existing, unrelated to this iteration's PriceTag/pdfTags scope) has 5 failing tests: test_shops_seeded_with_14_known_branches (needs_zone_review mismatch for Chiswick High Road), and 4 ai_quota/appraise tests failing with 'RuntimeError: Event loop is closed' under xdist parallel execution (test_ai_quota_indexes passes when run in isolation - likely xdist worker teardown race, not an app bug). Not caused by this iteration's changes (only PriceTag.tsx and lib/pdfTags.ts were touched) so left unfixed per scope; flagged for main agent awareness."
+    }
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Single-item tag page (/tag/{id}) matches the new approved design: brand line, logo+full title, category/size, price, condition, RRP, barcode, dashed sticker outline, and 'All proceeds go to charity' exactly once, no QR",
+      "name": "tag-page-new-design-no-qr",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Logged in as master, resolved seeded item via GET /api/inventory (200, 13 items), navigated to /tag/{id}: tag-sticker visible x1, [data-testid=tag-qr] count=0, tag-barcode visible, body text contains 'All proceeds go to charity' exactly once, no 'all proceeds to the shop' text, tag-title exactly matches item.title. Re-ran successfully against public preview URL https://thrift-vision.preview.emergentagent.com."
+    },
+    {
+      "criterion": "Mass-print PDF (A6): new design, no QR, 40x25mm sticker beside price, barcode intact, new proceeds wording",
+      "name": "print-tags-a6-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created 2 tscheck-pdfnew-a6-* items via POST /api/inventory, opened /print-tags?ids=...&size=A6: tag-sticker and tag-barcode present per tile, tag-qr count=0. Captured generated PDF blob via URL.createObjectURL hook + print-sheet-button, extracted text with pdfjs-dist getTextContent: 'RRP £80.00 · All proceeds go to charity' present per tile, title uncut, no 'all proceeds to the shop'. Fixtures deleted via DELETE /api/inventory/{id} after run."
+    },
+    {
+      "criterion": "Mass-print PDF (A7): same new design/content as A6",
+      "name": "print-tags-a7-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same flow as A6 with size=A7: DOM preview shows tag-sticker+tag-barcode per tile, tag-qr=0; extracted PDF text contains 'RRP £80.00 · All proceeds go to charity' and full title 'tscheck-pdfnew-a7-0'."
+    },
+    {
+      "criterion": "Mass-print PDF (A8): stacked layout, no barcode, still carries proceeds wording",
+      "name": "print-tags-a8-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "size=A8 preview: tag-sticker present per tile, tag-barcode count=0, tag-qr count=0. Extracted PDF text: 'RRP £80.00 · All proceeds go to charity', price '£15.00', full title present."
+    },
+    {
+      "criterion": "Bulk-print selection workflow on /inventory opens /print-tags with selected ids",
+      "name": "inventory-bulk-select-opens-print-tags",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /inventory, enabled print-mode-toggle, clicked select-{id} for 2 seeded items, print-selected-button became enabled, click navigated to /print-tags?ids=..., preview tile count (tag-sticker) equalled 2."
+    },
+    {
+      "criterion": "No regressions: tag page Mark sold/Edit details/Print tag, Scan tag camera dialog, barcode/manual SKU lookup from inventory",
+      "name": "tag-page-regressions-sell-edit-print-scan",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck-regression-item via POST /api/inventory, on /tag/{id}: print-tag-button fired stubbed window.print without error, mark-sold-button opened sell-dialog, edit-details-button opened edit-dialog. On /inventory, scan-button opened scanner-dialog; manual-sku-input with seeded SKU 966971191267 resolved to tag-title 'Brook Taverner Men's Suit'. Fixture deleted after run."
+    }
+  ]
+}

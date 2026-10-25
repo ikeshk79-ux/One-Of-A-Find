@@ -1,12 +1,11 @@
 import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
-import QRCode from "qrcode";
 import BrandLogo from "@/components/BrandLogo";
 import type { InventoryItem } from "@/lib/types";
 import { gbp } from "@/lib/types";
 
 /** Supported tag sizes for bulk-print sheets. ISO A-series folds exactly into A4 so a sheet
- * tiles with zero waste: A6=4/page, A7=8/page, A8=16/page. See `tag-sheet-*` CSS in index.css. */
+ * tiles with zero waste: A6=4/page, A7=4/page, A8=16/page. See `tag-sheet-*` CSS in index.css. */
 export type TagSize = "A6" | "A7" | "A8";
 
 type SizeSpec = {
@@ -23,11 +22,22 @@ type SizeSpec = {
   barcodeHeight: number;
   barcodeWidth: number;
   barcodeFontSize: number;
-  qr: number;
+  /** `beside` lays sticker next to the price block; `below` stacks it full-width under the price.
+   * A6 has room for beside; A7 is tight but fits beside with a smaller price glyph; A8 cannot
+   * fit a 40mm sticker next to any readable price and must stack. */
+  stickerLayout: "beside" | "below";
+  /** A8 drops the barcode entirely — the sticker (40×25mm) plus price plus metadata already
+   * fills the available 48×70mm inner space. Confirmed with the shop manager. */
+  showBarcode: boolean;
 };
 
+/** Required sticker-area footprint, in millimetres. Must print at exactly these dimensions at
+ * 100% print scale so a pre-cut sticker lines up with the outlined area. */
+const STICKER_W_MM = 40;
+const STICKER_H_MM = 25;
+
 const SIZE_SPEC: Record<TagSize, SizeSpec> = {
-  // A6 = 105×148mm, 4/sheet — plenty of room, barcode scans trivially.
+  // A6 = 105×148mm, 4/sheet — plenty of room; sticker fits beside the price with margin to spare.
   A6: {
     w: "105mm",
     h: "148mm",
@@ -40,25 +50,30 @@ const SIZE_SPEC: Record<TagSize, SizeSpec> = {
     barcodeHeight: 50,
     barcodeWidth: 2,
     barcodeFontSize: 11,
-    qr: 86,
+    stickerLayout: "beside",
+    showBarcode: true,
   },
-  // A7 = 74×105mm, 8/sheet — the sweet spot: compact but still clearly legible.
+  // A7 = 74×105mm, 4/sheet. Inner width 68mm = 40mm sticker + 28mm for the price block, so the
+  // price glyph is sized smaller than A6 to make room without truncating 4-digit totals.
   A7: {
     w: "74mm",
     h: "105mm",
     pad: "3.5mm",
     brandFs: "9px",
     titleFs: "11px",
-    priceFs: "22px",
+    priceFs: "17px",
     metaFs: "8px",
     logo: 20,
-    barcodeHeight: 32,
-    barcodeWidth: 1.5,
-    barcodeFontSize: 8,
-    qr: 56,
+    barcodeHeight: 28,
+    barcodeWidth: 1.4,
+    barcodeFontSize: 7,
+    stickerLayout: "beside",
+    showBarcode: true,
   },
-  // A8 = 52×74mm, 16/sheet — the default. Barcode shrinks but still scans off a typical phone;
-  // the brand lockup is dropped and the layout stacks vertically to maximise the price glyph.
+  // A8 = 52×74mm, 16/sheet. Not enough width for sticker-beside-price AND no room left over for
+  // the barcode once the 40×25mm sticker takes 25mm of vertical space, so the manager opted to
+  // drop the barcode on A8 and stack the sticker below the price. (The barcode still prints on
+  // A6/A7, which is what in-store till scans typically use.)
   A8: {
     w: "52mm",
     h: "74mm",
@@ -68,12 +83,33 @@ const SIZE_SPEC: Record<TagSize, SizeSpec> = {
     priceFs: "17px",
     metaFs: "6.5px",
     logo: 14,
-    barcodeHeight: 20,
-    barcodeWidth: 1,
-    barcodeFontSize: 6,
-    qr: 38,
+    barcodeHeight: 0,
+    barcodeWidth: 0,
+    barcodeFontSize: 0,
+    stickerLayout: "below",
+    showBarcode: false,
   },
 };
+
+/** Dashed outlined placeholder for the physical sticker. No logo/barcode/text goes inside — this
+ * area is reserved for the pre-printed sticker that the volunteer applies after cutting. Rendered
+ * with the actual millimetre dimensions so it prints at 100% scale. */
+function StickerArea({ testid = "tag-sticker" }: { testid?: string }) {
+  return (
+    <div
+      data-testid={testid}
+      style={{
+        width: `${STICKER_W_MM}mm`,
+        height: `${STICKER_H_MM}mm`,
+        border: "0.25mm dashed #6b7280",
+        borderRadius: "0.6mm",
+        flexShrink: 0,
+        boxSizing: "border-box",
+      }}
+      aria-label={`Sticker area ${STICKER_W_MM}mm by ${STICKER_H_MM}mm`}
+    />
+  );
+}
 
 /** PriceTag. When `size` is omitted it renders the legacy on-screen preview (used by
  * /tag/{id}'s single-item view, where a fixed 340px width keeps the mobile layout stable).
@@ -91,31 +127,25 @@ export default function PriceTag({
   showCutGuide?: boolean;
 }) {
   const barcodeRef = useRef<SVGSVGElement>(null);
-  const qrRef = useRef<HTMLCanvasElement>(null);
   const spec = size ? SIZE_SPEC[size] : null;
 
   useEffect(() => {
-    if (barcodeRef.current) {
-      // CODE128 (alphanumeric) so the gift aid number rides in the barcode alongside the SKU.
-      const barcodeValue = item.giftaid_ref ? `${item.sku}*${item.giftaid_ref}` : item.sku;
-      JsBarcode(barcodeRef.current, barcodeValue, {
-        format: "CODE128",
-        width: spec?.barcodeWidth ?? 2,
-        height: spec?.barcodeHeight ?? 54,
-        fontSize: spec?.barcodeFontSize ?? 12,
-        margin: 0,
-        background: "#ffffff",
-        lineColor: "#000000",
-      });
-    }
-    if (qrRef.current) {
-      // QR deep-links to the item and carries the gift aid ref so a scan allocates the sale to it.
-      const url =
-        `${window.location.origin}/tag/${item.id}` +
-        (item.giftaid_ref ? `?ga=${encodeURIComponent(item.giftaid_ref)}` : "");
-      void QRCode.toCanvas(qrRef.current, url, { width: spec?.qr ?? 104, margin: 0 });
-    }
-  }, [item.sku, item.id, item.giftaid_ref, spec]);
+    if (!barcodeRef.current) return;
+    // The legacy single-item preview always draws the barcode; the sized layouts honour the
+    // per-size `showBarcode` flag (A8 skips it to free up vertical space for the sticker).
+    if (spec && !spec.showBarcode) return;
+    // CODE128 (alphanumeric) so the gift aid number rides in the barcode alongside the SKU.
+    const barcodeValue = item.giftaid_ref ? `${item.sku}*${item.giftaid_ref}` : item.sku;
+    JsBarcode(barcodeRef.current, barcodeValue, {
+      format: "CODE128",
+      width: spec?.barcodeWidth ?? 2,
+      height: spec?.barcodeHeight ?? 54,
+      fontSize: spec?.barcodeFontSize ?? 12,
+      margin: 0,
+      background: "#ffffff",
+      lineColor: "#000000",
+    });
+  }, [item.sku, item.giftaid_ref, spec]);
 
   // ─── Legacy fixed-width preview (TagPage / on-screen) ────────────────────────
   if (!spec) {
@@ -134,7 +164,9 @@ export default function PriceTag({
             <p className="text-[11px] font-semibold uppercase tracking-widest" data-testid="tag-brand">
               {item.brand}
             </p>
-            <h2 className="mt-1 text-lg leading-tight font-bold" data-testid="tag-title">
+            {/* Title wraps freely — the printed tag must show the full product description without
+                truncation (previously ellipsised with .truncate / line-clamp). */}
+            <h2 className="mt-1 text-lg leading-tight font-bold break-words" data-testid="tag-title">
               {item.title}
             </h2>
           </div>
@@ -143,8 +175,8 @@ export default function PriceTag({
           {item.category}
           {item.size ? ` · Size ${item.size}` : ""}
         </p>
-        <div className="mt-4 flex items-end justify-between">
-          <div>
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <p className="text-[10px] uppercase tracking-widest text-black/60">Price</p>
             <p className="text-4xl font-bold tabular-nums" data-testid="tag-price">
               {gbp(item.recommended_price)}
@@ -153,10 +185,10 @@ export default function PriceTag({
               {item.condition} condition
             </p>
           </div>
-          <canvas ref={qrRef} data-testid="tag-qr" />
+          <StickerArea />
         </div>
         <p className="mt-2 text-[10px] text-black/60">
-          RRP when new {gbp(item.peak_retail_price)} · all proceeds to the shop
+          RRP when new {gbp(item.peak_retail_price)} · All proceeds go to charity
         </p>
         {item.giftaid_ref && (
           <p className="mt-1 text-[10px] font-mono text-black/60" data-testid="tag-giftaid">
@@ -171,6 +203,7 @@ export default function PriceTag({
   }
 
   // ─── Sized-for-print layout (A6/A7/A8) ────────────────────────────────────────
+  const stickerBeside = spec.stickerLayout === "beside";
   const isTiny = size === "A8";
   return (
     <div
@@ -203,19 +236,21 @@ export default function PriceTag({
         </span>
       </div>
 
-      {/* Brand + title. On A8 the brand logo is dropped to maximise price glyph space. */}
+      {/* Brand + title. On A8 the brand logo is dropped to maximise price glyph space.
+          Title uses line-clamp as a safety net on tiny A8 tags but is otherwise unclamped so the
+          full product description stays legible on A6/A7. */}
       <div className="flex items-start" style={{ gap: "1.5mm" }}>
         {!isTiny && <BrandLogo brand={item.brand} size={spec.logo} testid="tag-brand-logo" />}
         <div className="min-w-0 flex-1">
           <p
-            className="truncate font-semibold uppercase tracking-widest"
+            className="font-semibold uppercase tracking-widest break-words"
             style={{ fontSize: spec.brandFs }}
             data-testid="tag-brand"
           >
             {item.brand}
           </p>
           <h2
-            className="line-clamp-2 leading-tight font-bold"
+            className={`leading-tight font-bold break-words ${isTiny ? "line-clamp-2" : ""}`}
             style={{ fontSize: spec.titleFs, marginTop: "0.5mm" }}
             data-testid="tag-title"
           >
@@ -225,7 +260,7 @@ export default function PriceTag({
       </div>
 
       <p
-        className="truncate text-black/60"
+        className="text-black/60 break-words"
         style={{ fontSize: spec.metaFs }}
         data-testid="tag-category"
       >
@@ -233,40 +268,75 @@ export default function PriceTag({
         {item.size ? ` · Size ${item.size}` : ""}
       </p>
 
-      <div
-        className="flex items-end justify-between gap-1"
-        style={{ marginTop: "auto" }}
-      >
-        <div className="min-w-0 flex-1">
-          <p
-            className="uppercase tracking-widest text-black/60"
-            style={{ fontSize: spec.metaFs }}
-          >
-            Price
-          </p>
-          <p
-            className="truncate font-bold tabular-nums"
-            style={{ fontSize: spec.priceFs, lineHeight: 1 }}
-            data-testid="tag-price"
-          >
-            {gbp(item.recommended_price)}
-          </p>
-          <p
-            className="truncate text-black/60"
-            style={{ fontSize: spec.metaFs, marginTop: "0.5mm" }}
-            data-testid="tag-condition"
-          >
-            {item.condition}
-          </p>
+      {/* Price + sticker row. On A6/A7 they sit side-by-side; on A8 the sticker drops to its
+          own full-width row below the price so the 40×25mm footprint is preserved. */}
+      {stickerBeside ? (
+        <div
+          className="flex items-end justify-between gap-1"
+          style={{ marginTop: "auto" }}
+        >
+          <div className="min-w-0 flex-1">
+            <p
+              className="uppercase tracking-widest text-black/60"
+              style={{ fontSize: spec.metaFs }}
+            >
+              Price
+            </p>
+            <p
+              className="truncate font-bold tabular-nums"
+              style={{ fontSize: spec.priceFs, lineHeight: 1 }}
+              data-testid="tag-price"
+            >
+              {gbp(item.recommended_price)}
+            </p>
+            <p
+              className="text-black/60 break-words"
+              style={{ fontSize: spec.metaFs, marginTop: "0.5mm" }}
+              data-testid="tag-condition"
+            >
+              {item.condition} condition
+            </p>
+          </div>
+          <StickerArea />
         </div>
-        {/* QR must never shrink — fixed footprint right of the price block. Price text truncates
-            with ellipsis instead of overlapping (observed on 4-digit prices like "£225.00" on A8). */}
-        <canvas ref={qrRef} className="shrink-0" data-testid="tag-qr" />
-      </div>
+      ) : (
+        <div className="flex flex-col" style={{ marginTop: "auto", gap: "1mm" }}>
+          <div>
+            <p
+              className="uppercase tracking-widest text-black/60"
+              style={{ fontSize: spec.metaFs }}
+            >
+              Price
+            </p>
+            <p
+              className="truncate font-bold tabular-nums"
+              style={{ fontSize: spec.priceFs, lineHeight: 1 }}
+              data-testid="tag-price"
+            >
+              {gbp(item.recommended_price)}
+            </p>
+            <p
+              className="text-black/60 break-words"
+              style={{ fontSize: spec.metaFs, marginTop: "0.5mm" }}
+              data-testid="tag-condition"
+            >
+              {item.condition} condition
+            </p>
+          </div>
+          <div className="self-center">
+            <StickerArea />
+          </div>
+        </div>
+      )}
 
       {!isTiny && (
-        <p className="text-black/60" style={{ fontSize: spec.metaFs }}>
-          RRP {gbp(item.peak_retail_price)} · all proceeds to the shop
+        <p className="text-black/60 break-words" style={{ fontSize: spec.metaFs }}>
+          RRP {gbp(item.peak_retail_price)} · All proceeds go to charity
+        </p>
+      )}
+      {isTiny && (
+        <p className="text-black/60" style={{ fontSize: spec.metaFs }} data-testid="tag-proceeds">
+          All proceeds go to charity
         </p>
       )}
       {item.giftaid_ref && !isTiny && (
@@ -278,12 +348,14 @@ export default function PriceTag({
           Gift Aid: {item.giftaid_ref}
         </p>
       )}
-      <div
-        className="flex justify-center border-t border-black/20"
-        style={{ paddingTop: "1mm" }}
-      >
-        <svg ref={barcodeRef} data-testid="tag-barcode" />
-      </div>
+      {spec.showBarcode && (
+        <div
+          className="flex justify-center border-t border-black/20"
+          style={{ paddingTop: "1mm" }}
+        >
+          <svg ref={barcodeRef} data-testid="tag-barcode" />
+        </div>
+      )}
     </div>
   );
 }

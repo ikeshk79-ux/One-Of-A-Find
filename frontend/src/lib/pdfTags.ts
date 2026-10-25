@@ -9,14 +9,14 @@
  *   coordinates — the mobile PDF viewer honours those unconditionally, and the printer sees
  *   exactly the layout we drew.
  *
- * The layout is drawn with jsPDF primitives (text, lines, rect, addImage for the QR+barcode)
- * rather than html2canvas-ing the DOM, so each tag is pixel-perfect at any zoom and the output
- * stays small (vector text + two small PNGs per tile).
+ * The layout is drawn with jsPDF primitives (text, lines, rect, addImage for the barcode) rather
+ * than html2canvas-ing the DOM, so each tag is pixel-perfect at any zoom and the output stays
+ * small (vector text + one small PNG per tile). A dashed outlined rectangle marks where the
+ * physical sticker is applied — no QR code is drawn on any tag.
  */
 
 import jsPDF from "jspdf";
 import JsBarcode from "jsbarcode";
-import QRCode from "qrcode";
 import { brandLogoUrl } from "@/lib/brandDomain";
 import type { InventoryItem } from "@/lib/types";
 import { gbp } from "@/lib/types";
@@ -24,8 +24,10 @@ import { gbp } from "@/lib/types";
 export type PdfTagSize = "A6" | "A7" | "A8";
 
 /** Physical size + layout knobs per tag size. Dimensions are mm; "cols/rows" is the practical
- * printed tiling on an A4 sheet (A6=2×2, A7=2×2 — the ISO fold yields 8×A7 per A4 only when the
- * sheet is cut, uncut prints 4-up — A8=4×4). Font sizes are pt because jsPDF uses pt natively. */
+ * printed tiling on an A4 sheet (A6=2×2, A7=2×2, A8=4×4). Font sizes are pt because jsPDF uses pt
+ * natively. `stickerLayout` places the 40×25mm sticker area either beside the price (A6/A7) or
+ * stacked below it (A8, which has no horizontal room). `showBarcode` is false on A8 only — the
+ * sticker consumes the vertical space the barcode used to occupy. */
 type PdfSpec = {
   w: number; // tag width mm
   h: number; // tag height mm
@@ -36,22 +38,31 @@ type PdfSpec = {
   brandFs: number;
   priceFs: number;
   metaFs: number;
-  qr: number; // QR edge length, mm
   barcodeH: number; // barcode height, mm
   barcodeW: number; // barcode width in the PDF, mm
+  stickerLayout: "beside" | "below";
+  showBarcode: boolean;
 };
 
+/** Required sticker-area footprint in millimetres — must print at exactly these dimensions at
+ * 100% scale so a pre-cut adhesive sticker lines up with the outlined area on the printed tag. */
+const STICKER_W_MM = 40;
+const STICKER_H_MM = 25;
+
 const SPECS: Record<PdfTagSize, PdfSpec> = {
-  A6: { w: 105, h: 148, cols: 2, rows: 2, padding: 5, titleFs: 12, brandFs: 8, priceFs: 28, metaFs: 7, qr: 24, barcodeH: 14, barcodeW: 70 },
-  // A7 fits 2 cols × 2 rows (148×210mm) comfortably inside A4 — the ISO fold math (8×A7 per A4)
-  // only works when you cut the sheet, which isn't what we do here. 4-up printed uncut is the
-  // practical layout; the vertical slack centres the grid on the page.
-  A7: { w: 74,  h: 105, cols: 2, rows: 2, padding: 3, titleFs: 9,  brandFs: 7, priceFs: 20, metaFs: 6, qr: 18, barcodeH: 10, barcodeW: 50 },
-  A8: { w: 52,  h: 74,  cols: 4, rows: 4, padding: 2, titleFs: 7,  brandFs: 5.5, priceFs: 15, metaFs: 5, qr: 12, barcodeH: 7,  barcodeW: 36 },
+  A6: { w: 105, h: 148, cols: 2, rows: 2, padding: 5, titleFs: 12, brandFs: 8, priceFs: 28, metaFs: 7, barcodeH: 14, barcodeW: 70, stickerLayout: "beside", showBarcode: true },
+  // A7 fits 2 cols × 2 rows (148×210mm) comfortably inside A4. The 40mm sticker leaves roughly
+  // 28mm beside it for the price block, so the price glyph is sized smaller than A6 to avoid
+  // overlapping 4-digit totals like "£550.00".
+  A7: { w: 74,  h: 105, cols: 2, rows: 2, padding: 3, titleFs: 9,  brandFs: 7, priceFs: 16, metaFs: 6, barcodeH: 9,  barcodeW: 50, stickerLayout: "beside", showBarcode: true },
+  // A8 inner is 48×70mm. The 40mm sticker can't sit beside any readable price, so it stacks
+  // below the price and the barcode is dropped — approved by the shop manager so the sticker
+  // footprint can be preserved.
+  A8: { w: 52,  h: 74,  cols: 4, rows: 4, padding: 2, titleFs: 7,  brandFs: 5.5, priceFs: 14, metaFs: 5, barcodeH: 0, barcodeW: 0, stickerLayout: "below", showBarcode: false },
 };
 
 /** Brand-logo size (mm square) per tag size. A8 drops the logo entirely — there isn't enough
- * width for it alongside the condition text and the barcode would start to collide. */
+ * width for it alongside the condition text once the sticker row claims the bottom half. */
 const LOGO_MM: Record<PdfTagSize, number> = { A6: 10, A7: 7, A8: 5 };
 
 /** Fetch unavatar.io's logo PNG for a brand, data-url it so it can be embedded. Null when the
@@ -146,14 +157,6 @@ async function makeBarcodePng(sku: string, giftaidRef: string | null, widthPx: n
   return svgToPng(new XMLSerializer().serializeToString(svg), widthPx, heightPx);
 }
 
-/** Deep-link QR for /tag/{id}, carrying the gift aid ref so a scan allocates the sale. */
-async function makeQrPng(itemId: string, giftaidRef: string | null, pixels: number): Promise<string> {
-  const url =
-    `${window.location.origin}/tag/${itemId}` +
-    (giftaidRef ? `?ga=${encodeURIComponent(giftaidRef)}` : "");
-  return QRCode.toDataURL(url, { width: pixels, margin: 0 });
-}
-
 /** Truncate `text` to the longest prefix that fits in `maxMm` at the current font size. */
 function fitText(pdf: jsPDF, text: string, maxMm: number): string {
   if (pdf.getTextWidth(text) <= maxMm) return text;
@@ -168,6 +171,16 @@ function fitText(pdf: jsPDF, text: string, maxMm: number): string {
   return text.slice(0, Math.max(0, lo - 1)) + "…";
 }
 
+/** Draw a dashed-outline rectangle marking the physical sticker area (no content inside). */
+function drawStickerArea(pdf: jsPDF, x: number, y: number, w: number, h: number) {
+  pdf.setLineWidth(0.2);
+  pdf.setDrawColor(120);
+  pdf.setLineDashPattern([0.8, 0.6], 0);
+  pdf.roundedRect(x, y, w, h, 0.6, 0.6);
+  pdf.setLineDashPattern([], 0);
+  pdf.setDrawColor(0);
+}
+
 /** Draw one tag box onto the pdf at (x, y). All measurements are mm. */
 async function drawTag(
   pdf: jsPDF,
@@ -178,7 +191,7 @@ async function drawTag(
   y: number,
   showCutGuide: boolean,
 ) {
-  const { w, h, padding, titleFs, brandFs, priceFs, metaFs, qr, barcodeH, barcodeW } = spec;
+  const { w, h, padding, titleFs, brandFs, priceFs, metaFs, barcodeH, barcodeW } = spec;
   const inner = { x: x + padding, y: y + padding, w: w - padding * 2, h: h - padding * 2 };
 
   pdf.setDrawColor(0);
@@ -214,8 +227,7 @@ async function drawTag(
   const brandTextW = inner.w - (hasLogo ? logoMm + 1.5 : 0);
 
   // Lay out the brand row anchored to a known top edge (rowTop), then place the title BELOW the
-  // logo's bottom edge so the two never collide. The previous attempt used a running cursor seeded
-  // off the brand baseline, which left the title drawn on top of a tall A6 logo.
+  // logo's bottom edge so the two never collide.
   const rowTop = bandBottom + padding * 0.5;
   let logoDrawn = false;
   if (hasLogo && logoDataUrl) {
@@ -232,9 +244,6 @@ async function drawTag(
   pdf.setFontSize(brandFs);
   const brandDrawX = logoDrawn ? brandTextX : inner.x;
   const brandDrawW = logoDrawn ? brandTextW : inner.w;
-  // Brand baseline sits vertically centred against the logo square, or just below rowTop when
-  // there is no logo. brandFs is in pt and jsPDF's baseline is at the glyph bottom, so centring
-  // the row by (logoMm/2 + brandFs*0.3) looks visually balanced for Helvetica.
   const brandBaseline = logoDrawn
     ? rowTop + logoMm / 2 + brandFs * 0.3
     : rowTop + brandFs * 0.35;
@@ -244,42 +253,62 @@ async function drawTag(
     brandBaseline,
   );
 
-  // Title starts strictly below the logo bottom (or below the brand text when no logo). Use the
-  // taller of the two so A6/A7 (tall logo) and A8 (short logo + taller brand text) both clear.
+  // Title wraps to multiple lines so the full product description stays legible — ellipsising
+  // a long title is the "unnecessary truncation" the design brief explicitly calls out. We cap
+  // to a per-size max line count so the title never pushes the price/sticker block down.
   const titleTop = Math.max(
     logoDrawn ? rowTop + logoMm : brandBaseline,
     brandBaseline,
   ) + 1;
   pdf.setFontSize(titleFs);
-  const titleBaseline = titleTop + titleFs * 0.4;
-  pdf.text(fitText(pdf, item.title ?? "", inner.w), inner.x, titleBaseline);
+  const titleLineHeightMm = titleFs * 0.42;
+  const titleMaxLines = size === "A8" ? 2 : 3;
+  const titleLines = pdf
+    .splitTextToSize(item.title ?? "", inner.w)
+    .slice(0, titleMaxLines);
+  // If the title overflows the max line count, append an ellipsis on the final line so the
+  // reader knows there's more without the previous full-string ellipsis trimming words mid-way.
+  const originalLines = pdf.splitTextToSize(item.title ?? "", inner.w);
+  if (originalLines.length > titleMaxLines && titleLines.length > 0) {
+    const last = titleLines[titleLines.length - 1];
+    titleLines[titleLines.length - 1] = fitText(pdf, `${last}…`, inner.w);
+  }
+  titleLines.forEach((line: string, i: number) => {
+    pdf.text(line, inner.x, titleTop + titleFs * 0.4 + i * titleLineHeightMm);
+  });
 
-  let cursor = titleBaseline;
+  let cursor = titleTop + titleFs * 0.4 + (titleLines.length - 1) * titleLineHeightMm;
 
-  // Category + size (one line, muted colour).
+  // Category + size (one line, muted colour). Allowed to wrap over 2 lines on roomier sizes so a
+  // long category like "Women's jackets/coats · Size UK 8 · S · EU 36" is not cut off.
   cursor += metaFs * 0.6 + 0.4;
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(metaFs);
   pdf.setTextColor(90);
   const meta = `${item.category ?? ""}${item.size ? " · Size " + item.size : ""}`;
-  pdf.text(fitText(pdf, meta, inner.w), inner.x, cursor);
+  const metaMaxLines = size === "A8" ? 1 : 2;
+  const metaLines = pdf.splitTextToSize(meta, inner.w).slice(0, metaMaxLines);
+  metaLines.forEach((line: string, i: number) => {
+    pdf.text(line, inner.x, cursor + i * metaFs * 0.55);
+  });
   pdf.setTextColor(0);
 
-  // ─── Price block (left) + QR (right) ──────────────────────────────────────
-  // Pin the price-and-QR row near the lower-middle so the barcode has room at the bottom.
-  const barcodeY = y + h - padding - barcodeH;
-  const priceRowBottom = barcodeY - 1.5;
-  const priceLabelY = priceRowBottom - priceFs * 0.9 - metaFs * 0.5 - 1;
-  pdf.setFontSize(metaFs);
-  pdf.setTextColor(90);
-  pdf.text("PRICE", inner.x, priceLabelY);
-  pdf.setTextColor(0);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(priceFs);
-  const priceText = gbp(item.recommended_price);
-  pdf.text(priceText, inner.x, priceLabelY + priceFs * 0.9);
-  // Condition sub-label beneath price (hidden on A8 to free up vertical space).
-  if (spec.w >= 74) {
+  // ─── Price block + sticker area ───────────────────────────────────────────
+  // On A6/A7 the sticker sits to the right of the price; on A8 it stacks below with the price
+  // and the barcode is dropped so the sticker's 25mm height fits.
+  const proceedsLineY = y + h - padding - (spec.showBarcode ? barcodeH + metaFs * 0.6 + 0.8 : metaFs * 0.6 + 0.8);
+  const barcodeY = spec.showBarcode ? y + h - padding - barcodeH : 0;
+
+  if (spec.stickerLayout === "beside") {
+    const priceLabelY = proceedsLineY - priceFs * 0.9 - metaFs * 0.6 - 1;
+    pdf.setFontSize(metaFs);
+    pdf.setTextColor(90);
+    pdf.text("PRICE", inner.x, priceLabelY);
+    pdf.setTextColor(0);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(priceFs);
+    const priceText = gbp(item.recommended_price);
+    pdf.text(priceText, inner.x, priceLabelY + priceFs * 0.9);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(metaFs);
     pdf.setTextColor(90);
@@ -289,30 +318,56 @@ async function drawTag(
       priceLabelY + priceFs * 0.9 + metaFs * 0.6,
     );
     pdf.setTextColor(0);
+
+    // Sticker area to the right of the price block (40×25mm, dashed outline, bottom-aligned to
+    // the barcode so there's a consistent visual baseline across the sheet).
+    const stickerX = inner.x + inner.w - STICKER_W_MM;
+    const stickerY = proceedsLineY - STICKER_H_MM - 0.5;
+    drawStickerArea(pdf, stickerX, stickerY, STICKER_W_MM, STICKER_H_MM);
+  } else {
+    // A8: stack price above sticker, drop barcode. Keep the sticker centred horizontally.
+    const stickerY = proceedsLineY - STICKER_H_MM - 0.5;
+    const priceLabelY = stickerY - priceFs * 0.9 - metaFs * 0.5 - 1;
+    pdf.setFontSize(metaFs);
+    pdf.setTextColor(90);
+    pdf.text("PRICE", inner.x, priceLabelY);
+    pdf.setTextColor(0);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(priceFs);
+    pdf.text(gbp(item.recommended_price), inner.x, priceLabelY + priceFs * 0.9);
+    // No "Condition" sub-line on A8 — the condition is already shown in the top band and vertical
+    // real estate is tight. The brief lets us keep tiny-tag details minimal.
+    const stickerX = inner.x + (inner.w - STICKER_W_MM) / 2;
+    drawStickerArea(pdf, stickerX, stickerY, STICKER_W_MM, STICKER_H_MM);
   }
 
-  // QR to the right of the price block.
-  const qrPx = Math.max(96, Math.round(qr * 10));
-  const qrPng = await makeQrPng(item.id, item.giftaid_ref ?? null, qrPx);
-  const qrX = inner.x + inner.w - qr;
-  const qrY = priceLabelY - 0.5;
-  pdf.addImage(qrPng, "PNG", qrX, qrY, qr, qr);
+  // Proceeds / RRP line sits above the barcode on A6/A7 and above the bottom padding on A8.
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(metaFs);
+  pdf.setTextColor(90);
+  const rrpText = item.peak_retail_price
+    ? `RRP ${gbp(item.peak_retail_price)} · All proceeds go to charity`
+    : "All proceeds go to charity";
+  pdf.text(fitText(pdf, rrpText, inner.w), inner.x, proceedsLineY);
+  pdf.setTextColor(0);
 
-  // ─── Barcode row ──────────────────────────────────────────────────────────
-  pdf.setDrawColor(180);
-  pdf.line(inner.x, barcodeY - 0.6, inner.x + inner.w, barcodeY - 0.6);
-  pdf.setDrawColor(0);
-  const bcW = Math.min(barcodeW, inner.w);
-  const bcX = inner.x + (inner.w - bcW) / 2;
-  const barcodePx = Math.round(bcW * 10);
-  const barcodePxH = Math.round(barcodeH * 10);
-  const barcodePng = await makeBarcodePng(
-    item.sku,
-    item.giftaid_ref ?? null,
-    barcodePx,
-    barcodePxH,
-  );
-  pdf.addImage(barcodePng, "PNG", bcX, barcodeY, bcW, barcodeH);
+  // ─── Barcode row (A6/A7 only) ─────────────────────────────────────────────
+  if (spec.showBarcode) {
+    pdf.setDrawColor(180);
+    pdf.line(inner.x, barcodeY - 0.6, inner.x + inner.w, barcodeY - 0.6);
+    pdf.setDrawColor(0);
+    const bcW = Math.min(barcodeW, inner.w);
+    const bcX = inner.x + (inner.w - bcW) / 2;
+    const barcodePx = Math.round(bcW * 10);
+    const barcodePxH = Math.round(barcodeH * 10);
+    const barcodePng = await makeBarcodePng(
+      item.sku,
+      item.giftaid_ref ?? null,
+      barcodePx,
+      barcodePxH,
+    );
+    pdf.addImage(barcodePng, "PNG", bcX, barcodeY, bcW, barcodeH);
+  }
 }
 
 /** Build and open/download the PDF. Returns the generated Blob for tests. */
@@ -351,7 +406,7 @@ export async function generateTagsPdf({
     const row = Math.floor(slot / spec.cols);
     const x = originX + col * spec.w;
     const y = originY + row * spec.h;
-    // Awaiting inside the loop keeps QR/barcode generation sequential; the volunteer waits a
+    // Awaiting inside the loop keeps barcode generation sequential; the volunteer waits a
     // second or two for 16 tiles — not worth the complexity of a parallel Promise.all here.
     // eslint-disable-next-line no-await-in-loop
     await drawTag(pdf, tiles[i], size, spec, x, y, showCutGuide);

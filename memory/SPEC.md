@@ -392,7 +392,10 @@ independent of the session branch.
    direct `navigator.mediaDevices.getUserMedia` (same pattern as `CameraCapture`) and decodes frames
    itself on an offscreen canvas via zxing's `decodeFromCanvas` every ~220ms; the `<video>` stays
    mounted and visible for the dialog's lifetime (hiding it suspends frame delivery on mobile Chrome)
-   with spinner/error overlays stacked on top, plus a "Try again" retry and a manual-SKU fallback; search + category dropdown + sort
+   with spinner/error overlays stacked on top, plus a "Try again" retry and a manual-SKU fallback;
+   printed tags carry no QR code — a 40×25 mm sticker-area outline sits where the QR used to render
+   (beside the price on A6/A7, below the price on A8 — A8 also drops the barcode so the sticker
+   footprint fits), and the proceeds line reads "All proceeds go to charity"; search + category dropdown + sort
    (newest / price high→low / price low→high / category) + availability toggle; card click → /tag/:id.
    Each card has a corner expand icon (`enlarge-{id}`) that opens `ImageLightbox` — a zoomable photo
    viewer (all of the item's photos: main + label + detail shots, fetched full on demand via
