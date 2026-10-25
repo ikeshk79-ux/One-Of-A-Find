@@ -183,7 +183,7 @@ export default function PriceTag({
                 figure. Kept on one line so a long value like "New without tags" doesn't wrap. */}
             <p className="text-[10px] uppercase tracking-widest text-black/60">Condition:</p>
             <p
-              className="mt-1 text-4xl font-bold whitespace-nowrap"
+              className="mt-1 text-4xl font-bold leading-tight break-words"
               data-testid="tag-condition"
             >
               {item.condition}
@@ -235,8 +235,8 @@ export default function PriceTag({
         Condition:
       </p>
       <p
-        className="font-bold whitespace-nowrap"
-        style={{ fontSize: spec.priceFs, lineHeight: 1.05, marginTop: "0.4mm" }}
+        className="font-bold leading-tight break-words"
+        style={{ fontSize: spec.priceFs, marginTop: "0.4mm" }}
         data-testid="tag-condition"
       >
         {item.condition}

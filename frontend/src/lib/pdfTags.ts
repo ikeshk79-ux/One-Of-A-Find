@@ -299,15 +299,34 @@ async function drawTag(
   // ─── Price block + sticker area ───────────────────────────────────────────
   // Shared math for the price block height (CONDITION label → condition → PRICE label → price
   // → optional RRP), so both the beside and below layouts can position themselves without
-  // pushing the barcode row down.
+  // pushing the barcode row down. The condition can wrap to a second line when it's too wide
+  // for the price block (e.g. "New without tags" on A7's narrow left column), so the height
+  // is driven by how many lines we actually need.
   const priceLineGapMm = 0.4;
   const labelGapMm = 0.8;
   const hasRrp = (item.peak_retail_price ?? 0) > 0;
-  // Pre-compute block height: 2 meta labels + condition + price + optional RRP, with a slightly
-  // larger gap before each new section label.
+  const conditionMaxLines = 2;
+  // Width available to the condition and price lines: on the beside layout the sticker claims
+  // the right of the row, on the below layout the full inner width is available.
+  const priceColW =
+    spec.stickerLayout === "beside"
+      ? inner.w - STICKER_W_MM - 1
+      : inner.w;
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(priceFs);
+  const conditionLinesRaw = pdf.splitTextToSize(item.condition ?? "", priceColW);
+  const conditionLines = conditionLinesRaw.slice(0, conditionMaxLines);
+  // If the condition still overflows beyond conditionMaxLines, fit-ellipsize the last line so
+  // the text never extends into the sticker area.
+  if (conditionLinesRaw.length > conditionMaxLines && conditionLines.length > 0) {
+    const last = conditionLines[conditionLines.length - 1];
+    conditionLines[conditionLines.length - 1] = fitText(pdf, `${last}…`, priceColW);
+  }
+  const conditionBlockH = conditionLines.length * ptToMm(priceFs) + (conditionLines.length - 1) * priceLineGapMm;
+  // Pre-compute block height: 2 meta labels + (multi-line) condition + price + optional RRP.
   const priceBlockH =
     ptToMm(metaFs) +
-    priceLineGapMm + ptToMm(priceFs) +
+    priceLineGapMm + conditionBlockH +
     labelGapMm + ptToMm(metaFs) +
     priceLineGapMm + ptToMm(priceFs) +
     (hasRrp ? priceLineGapMm + ptToMm(rrpFs) : 0);
@@ -318,10 +337,12 @@ async function drawTag(
     pdf.setTextColor(90);
     pdf.text("CONDITION:", originX, y);
     pdf.setTextColor(0);
-    y += priceLineGapMm + ptToMm(priceFs);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(priceFs);
-    pdf.text(item.condition ?? "", originX, y);
+    for (let i = 0; i < conditionLines.length; i++) {
+      y += priceLineGapMm + ptToMm(priceFs);
+      pdf.text(conditionLines[i], originX, y);
+    }
     y += labelGapMm + ptToMm(metaFs);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(metaFs);
