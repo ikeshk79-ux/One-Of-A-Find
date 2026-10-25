@@ -50,15 +50,16 @@ const STICKER_W_MM = 40;
 const STICKER_H_MM = 25;
 
 const SPECS: Record<PdfTagSize, PdfSpec> = {
-  A6: { w: 105, h: 148, cols: 2, rows: 2, padding: 5, titleFs: 12, brandFs: 8, priceFs: 28, metaFs: 7, barcodeH: 14, barcodeW: 70, stickerLayout: "beside", showBarcode: true },
-  // A7 fits 2 cols × 2 rows (148×210mm) comfortably inside A4. The 40mm sticker leaves roughly
-  // 28mm beside it for the price block, so the price glyph is sized smaller than A6 to avoid
-  // overlapping 4-digit totals like "£550.00".
-  A7: { w: 74,  h: 105, cols: 2, rows: 2, padding: 3, titleFs: 9,  brandFs: 7, priceFs: 16, metaFs: 6, barcodeH: 9,  barcodeW: 50, stickerLayout: "beside", showBarcode: true },
+  A6: { w: 105, h: 148, cols: 2, rows: 2, padding: 5, titleFs: 12, brandFs: 8, priceFs: 24, metaFs: 7, barcodeH: 14, barcodeW: 70, stickerLayout: "beside", showBarcode: true },
+  // A7 fits 2 cols × 2 rows (148×210mm) comfortably inside A4. Inner width 68mm — the condition
+  // (same font as price) and price glyph both share this space with the 40×25mm sticker to the
+  // right, so the price font is sized so the longest condition string ("New without tags") stays
+  // on one line without crowding the sticker.
+  A7: { w: 74,  h: 105, cols: 2, rows: 2, padding: 3, titleFs: 9,  brandFs: 7, priceFs: 13, metaFs: 6, barcodeH: 9,  barcodeW: 50, stickerLayout: "beside", showBarcode: true },
   // A8 inner is 48×70mm. The 40mm sticker can't sit beside any readable price, so it stacks
   // below the price and the barcode is dropped — approved by the shop manager so the sticker
   // footprint can be preserved.
-  A8: { w: 52,  h: 74,  cols: 4, rows: 4, padding: 2, titleFs: 7,  brandFs: 5.5, priceFs: 14, metaFs: 5, barcodeH: 0, barcodeW: 0, stickerLayout: "below", showBarcode: false },
+  A8: { w: 52,  h: 74,  cols: 4, rows: 4, padding: 2, titleFs: 7,  brandFs: 5.5, priceFs: 11, metaFs: 5, barcodeH: 0, barcodeW: 0, stickerLayout: "below", showBarcode: false },
 };
 
 /** Brand-logo size (mm square) per tag size. A8 drops the logo entirely — there isn't enough
@@ -193,6 +194,11 @@ async function drawTag(
 ) {
   const { w, h, padding, titleFs, brandFs, priceFs, metaFs, barcodeH, barcodeW } = spec;
   const inner = { x: x + padding, y: y + padding, w: w - padding * 2, h: h - padding * 2 };
+  // Convert pt → mm the way jsPDF does when it draws a glyph (approx — 1pt ≈ 0.3528mm; the
+  // 0.9 factor accounts for Helvetica's cap-height-to-point ratio and matches the gap the DOM
+  // preview renders).
+  const ptToMm = (pt: number) => pt * 0.353 * 0.9;
+  const rrpFs = priceFs / 2;
 
   pdf.setDrawColor(0);
   if (showCutGuide) {
@@ -203,14 +209,11 @@ async function drawTag(
     pdf.setLineDashPattern([], 0);
   }
 
-  // ─── Top band: brand + condition ──────────────────────────────────────────
+  // ─── Top band: brand lockup only (condition moved to the price block below) ──
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(brandFs);
   pdf.setTextColor(0);
   pdf.text("One Of A Find", inner.x, inner.y + brandFs * 0.35);
-  const conditionText = item.condition ?? "";
-  const conditionW = pdf.getTextWidth(conditionText);
-  pdf.text(conditionText, inner.x + inner.w - conditionW, inner.y + brandFs * 0.35);
   const bandBottom = inner.y + brandFs * 0.5 + 1;
   pdf.setLineWidth(0.1);
   pdf.setDrawColor(180);
@@ -294,61 +297,77 @@ async function drawTag(
   pdf.setTextColor(0);
 
   // ─── Price block + sticker area ───────────────────────────────────────────
-  // On A6/A7 the sticker sits to the right of the price; on A8 it stacks below with the price
-  // and the barcode is dropped so the sticker's 25mm height fits.
+  // Shared math for the price block height (CONDITION label → condition → PRICE label → price
+  // → optional RRP), so both the beside and below layouts can position themselves without
+  // pushing the barcode row down.
+  const priceLineGapMm = 0.4;
+  const labelGapMm = 0.8;
+  const hasRrp = (item.peak_retail_price ?? 0) > 0;
+  // Pre-compute block height: 2 meta labels + condition + price + optional RRP, with a slightly
+  // larger gap before each new section label.
+  const priceBlockH =
+    ptToMm(metaFs) +
+    priceLineGapMm + ptToMm(priceFs) +
+    labelGapMm + ptToMm(metaFs) +
+    priceLineGapMm + ptToMm(priceFs) +
+    (hasRrp ? priceLineGapMm + ptToMm(rrpFs) : 0);
+  const drawPriceBlock = (originX: number, blockTop: number) => {
+    let y = blockTop + ptToMm(metaFs);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(metaFs);
+    pdf.setTextColor(90);
+    pdf.text("CONDITION:", originX, y);
+    pdf.setTextColor(0);
+    y += priceLineGapMm + ptToMm(priceFs);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(priceFs);
+    pdf.text(item.condition ?? "", originX, y);
+    y += labelGapMm + ptToMm(metaFs);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(metaFs);
+    pdf.setTextColor(90);
+    pdf.text("PRICE", originX, y);
+    pdf.setTextColor(0);
+    y += priceLineGapMm + ptToMm(priceFs);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(priceFs);
+    pdf.text(gbp(item.recommended_price), originX, y);
+    if (hasRrp) {
+      y += priceLineGapMm + ptToMm(rrpFs);
+      pdf.setFontSize(rrpFs);
+      pdf.text(`RRP ${gbp(item.peak_retail_price)}`, originX, y);
+    }
+  };
+
+  // Position the price-block + sticker row so the proceeds + barcode land at the fixed bottom.
   const proceedsLineY = y + h - padding - (spec.showBarcode ? barcodeH + metaFs * 0.6 + 0.8 : metaFs * 0.6 + 0.8);
   const barcodeY = spec.showBarcode ? y + h - padding - barcodeH : 0;
 
   if (spec.stickerLayout === "beside") {
-    const priceLabelY = proceedsLineY - priceFs * 0.9 - metaFs * 0.6 - 1;
-    pdf.setFontSize(metaFs);
-    pdf.setTextColor(90);
-    pdf.text("PRICE", inner.x, priceLabelY);
-    pdf.setTextColor(0);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(priceFs);
-    const priceText = gbp(item.recommended_price);
-    pdf.text(priceText, inner.x, priceLabelY + priceFs * 0.9);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(metaFs);
-    pdf.setTextColor(90);
-    pdf.text(
-      `${item.condition ?? ""} condition`,
-      inner.x,
-      priceLabelY + priceFs * 0.9 + metaFs * 0.6,
-    );
-    pdf.setTextColor(0);
-
-    // Sticker area to the right of the price block (40×25mm, dashed outline, bottom-aligned to
-    // the barcode so there's a consistent visual baseline across the sheet).
+    // Bottom-align the price block to the baseline of the sticker/proceeds row.
+    const blockBottom = proceedsLineY - 1;
+    const blockTop = blockBottom - priceBlockH;
+    drawPriceBlock(inner.x, blockTop);
+    // Sticker vertically centred against the price block so the row reads as a single band.
     const stickerX = inner.x + inner.w - STICKER_W_MM;
-    const stickerY = proceedsLineY - STICKER_H_MM - 0.5;
+    const stickerY = blockBottom - STICKER_H_MM;
     drawStickerArea(pdf, stickerX, stickerY, STICKER_W_MM, STICKER_H_MM);
   } else {
-    // A8: stack price above sticker, drop barcode. Keep the sticker centred horizontally.
+    // A8 stacked layout: price block, then sticker centred below it.
     const stickerY = proceedsLineY - STICKER_H_MM - 0.5;
-    const priceLabelY = stickerY - priceFs * 0.9 - metaFs * 0.5 - 1;
-    pdf.setFontSize(metaFs);
-    pdf.setTextColor(90);
-    pdf.text("PRICE", inner.x, priceLabelY);
-    pdf.setTextColor(0);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(priceFs);
-    pdf.text(gbp(item.recommended_price), inner.x, priceLabelY + priceFs * 0.9);
-    // No "Condition" sub-line on A8 — the condition is already shown in the top band and vertical
-    // real estate is tight. The brief lets us keep tiny-tag details minimal.
+    const blockBottom = stickerY - 1;
+    const blockTop = blockBottom - priceBlockH;
+    drawPriceBlock(inner.x, blockTop);
     const stickerX = inner.x + (inner.w - STICKER_W_MM) / 2;
     drawStickerArea(pdf, stickerX, stickerY, STICKER_W_MM, STICKER_H_MM);
   }
 
-  // Proceeds / RRP line sits above the barcode on A6/A7 and above the bottom padding on A8.
+  // Proceeds line — RRP moved to its own row under the price, so this line is just the
+  // charitable-use statement now.
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(metaFs);
   pdf.setTextColor(90);
-  const rrpText = item.peak_retail_price
-    ? `RRP ${gbp(item.peak_retail_price)} · All proceeds go to charity`
-    : "All proceeds go to charity";
-  pdf.text(fitText(pdf, rrpText, inner.w), inner.x, proceedsLineY);
+  pdf.text(fitText(pdf, "All proceeds go to charity", inner.w), inner.x, proceedsLineY);
   pdf.setTextColor(0);
 
   // ─── Barcode row (A6/A7 only) ─────────────────────────────────────────────

@@ -23,8 +23,8 @@ type SizeSpec = {
   barcodeWidth: number;
   barcodeFontSize: number;
   /** `beside` lays sticker next to the price block; `below` stacks it full-width under the price.
-   * A6 has room for beside; A7 is tight but fits beside with a smaller price glyph; A8 cannot
-   * fit a 40mm sticker next to any readable price and must stack. */
+   * A6 has room for beside; A7 fits beside with a smaller price glyph; A8 cannot fit a 40mm
+   * sticker next to any readable price and must stack. */
   stickerLayout: "beside" | "below";
   /** A8 drops the barcode entirely — the sticker (40×25mm) plus price plus metadata already
    * fills the available 48×70mm inner space. Confirmed with the shop manager. */
@@ -44,7 +44,7 @@ const SIZE_SPEC: Record<TagSize, SizeSpec> = {
     pad: "6mm",
     brandFs: "11px",
     titleFs: "16px",
-    priceFs: "34px",
+    priceFs: "30px",
     metaFs: "10px",
     logo: 28,
     barcodeHeight: 50,
@@ -53,15 +53,15 @@ const SIZE_SPEC: Record<TagSize, SizeSpec> = {
     stickerLayout: "beside",
     showBarcode: true,
   },
-  // A7 = 74×105mm, 4/sheet. Inner width 68mm = 40mm sticker + 28mm for the price block, so the
-  // price glyph is sized smaller than A6 to make room without truncating 4-digit totals.
+  // A7 = 74×105mm, 4/sheet. Inner width 68mm comfortably fits the condition + price block on
+  // the left and the 40×25mm sticker on the right.
   A7: {
     w: "74mm",
     h: "105mm",
     pad: "3.5mm",
     brandFs: "9px",
     titleFs: "11px",
-    priceFs: "17px",
+    priceFs: "18px",
     metaFs: "8px",
     logo: 20,
     barcodeHeight: 28,
@@ -70,17 +70,17 @@ const SIZE_SPEC: Record<TagSize, SizeSpec> = {
     stickerLayout: "beside",
     showBarcode: true,
   },
-  // A8 = 52×74mm, 16/sheet. Not enough width for sticker-beside-price AND no room left over for
-  // the barcode once the 40×25mm sticker takes 25mm of vertical space, so the manager opted to
-  // drop the barcode on A8 and stack the sticker below the price. (The barcode still prints on
-  // A6/A7, which is what in-store till scans typically use.)
+  // A8 = 52×74mm, 16/sheet. Not enough width for sticker-beside-price AND no room for the
+  // barcode once the 40×25mm sticker takes 25mm of vertical space, so the sticker stacks below
+  // the price and the barcode is dropped (approved by the shop manager). Price font kept small
+  // so the longest condition ("New without tags") stays on one line in the price block.
   A8: {
     w: "52mm",
     h: "74mm",
     pad: "2mm",
     brandFs: "7px",
     titleFs: "8.5px",
-    priceFs: "17px",
+    priceFs: "13px",
     metaFs: "6.5px",
     logo: 14,
     barcodeHeight: 0,
@@ -154,9 +154,10 @@ export default function PriceTag({
         className="print-sheet mx-auto w-[340px] rounded-lg border border-black bg-white p-5 text-black"
         data-testid="price-tag"
       >
+        {/* Top band — just the One Of A Find lockup. Condition no longer lives here; it moved
+            above the price in the bottom-left price area. */}
         <div className="flex items-start justify-between border-b border-black/20 pb-2">
           <span className="display-title text-[10px]">One Of A Find</span>
-          <span className="font-mono text-[10px]">{item.condition}</span>
         </div>
         <div className="mt-3 flex items-start gap-2">
           <BrandLogo brand={item.brand} size={28} testid="tag-brand-logo" />
@@ -177,19 +178,32 @@ export default function PriceTag({
         </p>
         <div className="mt-4 flex items-end justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-widest text-black/60">Price</p>
-            <p className="text-4xl font-bold tabular-nums" data-testid="tag-price">
+            {/* Condition sits above the price: a small "CONDITION:" meta label (matching the
+                "PRICE" label style) and the value in the same font / weight / size as the price
+                figure. Kept on one line so a long value like "New without tags" doesn't wrap. */}
+            <p className="text-[10px] uppercase tracking-widest text-black/60">Condition:</p>
+            <p
+              className="mt-1 text-4xl font-bold whitespace-nowrap"
+              data-testid="tag-condition"
+            >
+              {item.condition}
+            </p>
+            <p className="mt-2 text-[10px] uppercase tracking-widest text-black/60">Price</p>
+            <p className="mt-1 text-4xl font-bold tabular-nums" data-testid="tag-price">
               {gbp(item.recommended_price)}
             </p>
-            <p className="mt-1 text-[10px] text-black/60" data-testid="tag-condition">
-              {item.condition} condition
-            </p>
+            {item.peak_retail_price > 0 && (
+              <p
+                className="mt-1 text-lg font-bold tabular-nums"
+                data-testid="tag-rrp"
+              >
+                RRP {gbp(item.peak_retail_price)}
+              </p>
+            )}
           </div>
           <StickerArea />
         </div>
-        <p className="mt-2 text-[10px] text-black/60">
-          RRP when new {gbp(item.peak_retail_price)} · All proceeds go to charity
-        </p>
+        <p className="mt-2 text-[10px] text-black/60">All proceeds go to charity</p>
         {item.giftaid_ref && (
           <p className="mt-1 text-[10px] font-mono text-black/60" data-testid="tag-giftaid">
             Gift Aid: {item.giftaid_ref}
@@ -205,6 +219,53 @@ export default function PriceTag({
   // ─── Sized-for-print layout (A6/A7/A8) ────────────────────────────────────────
   const stickerBeside = spec.stickerLayout === "beside";
   const isTiny = size === "A8";
+  // RRP line is drawn at exactly 50% of the price font size, matching the design spec.
+  const rrpFs = `calc(${spec.priceFs} / 2)`;
+
+  // Shared left-hand price block (CONDITION label → condition → PRICE label → price → optional
+  // RRP). Rendered the same way regardless of whether the sticker sits beside or below the
+  // block — the surrounding wrapper handles the arrangement so a single component drives both
+  // layouts and never diverges.
+  const priceBlock = (
+    <div className="min-w-0 flex-1">
+      <p
+        className="uppercase tracking-widest text-black/60"
+        style={{ fontSize: spec.metaFs }}
+      >
+        Condition:
+      </p>
+      <p
+        className="font-bold whitespace-nowrap"
+        style={{ fontSize: spec.priceFs, lineHeight: 1.05, marginTop: "0.4mm" }}
+        data-testid="tag-condition"
+      >
+        {item.condition}
+      </p>
+      <p
+        className="uppercase tracking-widest text-black/60"
+        style={{ fontSize: spec.metaFs, marginTop: "0.8mm" }}
+      >
+        Price
+      </p>
+      <p
+        className="font-bold tabular-nums whitespace-nowrap"
+        style={{ fontSize: spec.priceFs, lineHeight: 1.05, marginTop: "0.4mm" }}
+        data-testid="tag-price"
+      >
+        {gbp(item.recommended_price)}
+      </p>
+      {item.peak_retail_price > 0 && (
+        <p
+          className="font-bold tabular-nums whitespace-nowrap"
+          style={{ fontSize: rrpFs, lineHeight: 1.05, marginTop: "0.4mm" }}
+          data-testid="tag-rrp"
+        >
+          RRP {gbp(item.peak_retail_price)}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div
       className="print-sheet bg-white text-black"
@@ -224,15 +285,14 @@ export default function PriceTag({
         border: showCutGuide ? "0.4mm dashed #000" : "0.1mm solid #e5e5e5",
       }}
     >
+      {/* Top band — One Of A Find lockup only. Condition no longer appears here; it moved into
+          the price block below. */}
       <div
-        className="flex items-start justify-between border-b border-black/20"
+        className="flex items-start border-b border-black/20"
         style={{ paddingBottom: "1mm" }}
       >
         <span className="display-title" style={{ fontSize: spec.brandFs }}>
           One Of A Find
-        </span>
-        <span className="font-mono" style={{ fontSize: spec.metaFs }}>
-          {item.condition}
         </span>
       </div>
 
@@ -275,70 +335,21 @@ export default function PriceTag({
           className="flex items-end justify-between gap-1"
           style={{ marginTop: "auto" }}
         >
-          <div className="min-w-0 flex-1">
-            <p
-              className="uppercase tracking-widest text-black/60"
-              style={{ fontSize: spec.metaFs }}
-            >
-              Price
-            </p>
-            <p
-              className="truncate font-bold tabular-nums"
-              style={{ fontSize: spec.priceFs, lineHeight: 1 }}
-              data-testid="tag-price"
-            >
-              {gbp(item.recommended_price)}
-            </p>
-            <p
-              className="text-black/60 break-words"
-              style={{ fontSize: spec.metaFs, marginTop: "0.5mm" }}
-              data-testid="tag-condition"
-            >
-              {item.condition} condition
-            </p>
-          </div>
+          {priceBlock}
           <StickerArea />
         </div>
       ) : (
         <div className="flex flex-col" style={{ marginTop: "auto", gap: "1mm" }}>
-          <div>
-            <p
-              className="uppercase tracking-widest text-black/60"
-              style={{ fontSize: spec.metaFs }}
-            >
-              Price
-            </p>
-            <p
-              className="truncate font-bold tabular-nums"
-              style={{ fontSize: spec.priceFs, lineHeight: 1 }}
-              data-testid="tag-price"
-            >
-              {gbp(item.recommended_price)}
-            </p>
-            <p
-              className="text-black/60 break-words"
-              style={{ fontSize: spec.metaFs, marginTop: "0.5mm" }}
-              data-testid="tag-condition"
-            >
-              {item.condition} condition
-            </p>
-          </div>
+          {priceBlock}
           <div className="self-center">
             <StickerArea />
           </div>
         </div>
       )}
 
-      {!isTiny && (
-        <p className="text-black/60 break-words" style={{ fontSize: spec.metaFs }}>
-          RRP {gbp(item.peak_retail_price)} · All proceeds go to charity
-        </p>
-      )}
-      {isTiny && (
-        <p className="text-black/60" style={{ fontSize: spec.metaFs }} data-testid="tag-proceeds">
-          All proceeds go to charity
-        </p>
-      )}
+      <p className="text-black/60" style={{ fontSize: spec.metaFs }} data-testid="tag-proceeds">
+        All proceeds go to charity
+      </p>
       {item.giftaid_ref && !isTiny && (
         <p
           className="font-mono text-black/60"
