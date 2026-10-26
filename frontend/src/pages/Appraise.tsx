@@ -673,7 +673,30 @@ export default function Appraise() {
                 value={gbp(chosenPrice)}
                 caption={
                   priceChoice === "charity"
-                    ? `${condition} condition · ${Math.round((CONDITION_MULTIPLIERS[condition] ?? 1) * 100)}% of guide, rounded to 50p`
+                    ? (() => {
+                        const parts = [
+                          `${condition} condition`,
+                          `${Math.round((CONDITION_MULTIPLIERS[condition] ?? 1) * 100)}% of guide`,
+                        ];
+                        // Surface the shop's TfL-zone adjustment in the caption so volunteers
+                        // can sense-check why the hero differs from the guide × condition math
+                        // alone (and so a 0% zone is still named explicitly rather than feeling
+                        // like something is missing).
+                        if (zoneQ.data) {
+                          const z = zoneQ.data;
+                          // Backend may send `zone: "outside"` for shops outside the TfL
+                          // network (as a stringified sentinel) or `zone: null` for a shop
+                          // that hasn't been zoned yet — both map to the same caption branch.
+                          const isTflZone =
+                            typeof z.zone === "number" ||
+                            (typeof z.zone === "string" && /^\d+$/.test(z.zone));
+                          const zoneLabel = isTflZone ? `Zone ${z.zone}` : "Outside TfL";
+                          const sign = z.adjustment_percent > 0 ? "+" : "";
+                          parts.push(`${zoneLabel} ${sign}${z.adjustment_percent}%`);
+                        }
+                        parts.push("rounded");
+                        return parts.join(" · ");
+                      })()
                     : priceChoice === "peak"
                       ? "Peak RRP — top of market"
                       : "Volunteer-set price"

@@ -1,0 +1,45 @@
+{
+  "iteration": 48,
+  "mode": "retest",
+  "summary": "Retest of the Appraise.tsx fix for the 'Zone outside 0%' caption bug reported in iteration 47. Re-ran the backend price_source_contract test (unchanged, passing) and the full backend suite (same 5 pre-existing out-of-scope baseline failures as iteration 45/46/47, plus one extra ai_quota_daily_rollback_burst failure that passed cleanly on an isolated rerun -- classified flaky xdist event-loop teardown noise, not a regression). Re-ran the two relevant browser checks by name only: appraise-caption-zone-labels-and-live-switch (now fully green -- the non-TfL shop caption reads 'Outside TfL ... 0%' and no longer contains 'Zone outside'; Zone 2 and Zone 6 TfL captions still correct) and appraise-charity-peak-custom-price-math (still passing, confirming the save contract and Peak/Custom captions are untouched). All acceptance criteria in the briefing are now satisfied; no new bugs found.",
+  "passed": 3,
+  "failed": 0,
+  "flaky": 1,
+  "blocked": 0,
+  "test_error": 0,
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Charity Price hero caption reads 'Outside TfL 0%' (not 'Zone outside 0%') for a non-TfL shop, and still shows Zone N for TfL shops",
+      "name": "appraise-caption-zone-labels-and-live-switch",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check (mode: reran-persisted), fully green this time. At Askew Road (Zone 2): caption contained 'Very good condition', '90% of guide', 'Zone 2', '-5%'. At a freshly created tscheck-outside-caption-shop-<ts> (outside_zones:true): result-value-hero textContent now reads '...Very good condition \u00b7 90% of guide \u00b7 Outside TfL \u00b7 0% \u00b7 rounded' -- contains 'Outside TfL' and '0%', no longer contains the literal 'Zone outside' (screenshot outside-tfl-caption.png). Switching live to a fresh tscheck-zone6-caption-shop-<ts> (Zone 6, -25%) updated the hero/caption to 'Zone 6', '-25%', \u00a37.00 without a reload. Peak/Custom captions and hidden zone-adjustment-hint unchanged."
+    },
+    {
+      "criterion": "All other iteration-47 checks remain green: charity/peak/custom save contract unchanged",
+      "name": "appraise-charity-peak-custom-price-math",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check unchanged: Askew Road Zone-2 charity tile+hero+saved success-moment all \u00a39.00; Peak saved \u00a335.00 verbatim; Custom saved \u00a317.00 verbatim; zone-adjustment-hint hidden for peak/custom."
+    },
+    {
+      "criterion": "Backend contract unchanged: charity zone-adjusts, peak/custom save as entered (price_source_contract)",
+      "name": "test_tscheck_price_source_contract.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "pytest tests/test_tscheck_price_source_contract.py -> 3 passed in 1.33s against the live server."
+    },
+    {
+      "criterion": "No regression: backend full suite stays at its established baseline",
+      "name": "pytest full suite",
+      "lane": "backend",
+      "status": "flaky",
+      "evidence": "First run: 6 failed, 100 passed (the usual 5 baseline failures -- shops_seeded_data zone mismatch, ai_quota_indexes + ai_quota_daily 'Event loop is closed' xdist teardown noise, 2 real-image appraise tests missing /tmp/item.jpg fixture -- plus test_tscheck_ai_quota_daily_rollback_burst.py which failed under the same xdist event-loop-closed symptom). Isolated rerun of that one file: 1 passed in 6.22s, confirming flaky xdist teardown interaction rather than a regression from this iteration's frontend-only fix."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, out-of-scope (reconfirmed again, unrelated to this iteration): test_tscheck_shops_seeded_data.py seeded-zone mismatch on Chiswick High Road; test_tscheck_ai_quota_indexes.py / test_tscheck_ai_quota_daily.py / test_tscheck_ai_quota_daily_rollback_burst.py intermittent 'Event loop is closed' under pytest-xdist teardown; test_tscheck_appraise_robustness_and_gating.py / test_tscheck_appraise_endpoint.py missing /tmp/item.jpg fixture for real-AI appraise calls."
+  ]
+}

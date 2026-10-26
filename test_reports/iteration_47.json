@@ -1,0 +1,67 @@
+{
+  "iteration": 47,
+  "mode": "retest",
+  "summary": "Retest of Appraise.tsx hero caption now surfacing the TfL zone + adjustment % for Charity Price. Backend full-suite rerun (same 5 pre-existing out-of-scope failures as iteration 45/46, reconfirmed, none touch this change). Re-ran the existing appraise-charity-peak-custom-price-math browser check (still passing) and the price_source_contract backend test (still passing). Added one new browser check, appraise-caption-zone-labels-and-live-switch, covering the net-new criteria: caption wording at Zone 2 ('Very good condition', '90% of guide', 'Zone 2', '-5%'), a live location switch to a fixture Zone-6 shop updating the hero/caption without reload within ~2s, Charity tile mirroring the hero at the new zone, and Peak/Custom captions + hidden hint unchanged. That check surfaced a real frontend bug: switching to a non-TfL ('outside_zones') shop renders the caption as 'Zone outside 0%' instead of dropping the zone clause or showing 'Outside TfL 0%' as the acceptance criterion requires, because Appraise.tsx's inline caption logic treats the backend's zone:\"outside\" string as truthy and interpolates it directly (`z.zone ? \\`Zone ${z.zone}\\` : \"Outside TfL\"`), unlike the sibling ZoneAdjustmentHint component which has the analogous issue but is not in scope here.",
+  "passed": 7,
+  "failed": 1,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "Charity Price hero shows the zone-adjusted price and the caption names the shop's TfL zone (Zone 2, -5%, condition %)",
+      "name": "appraise-caption-zone-labels-and-live-switch",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "At Askew Road (Zone 2, -5%) with condition 'Very good': result-value-hero showed \u00a39.00 and caption text contained all required substrings 'Very good condition', '90% of guide', 'Zone 2', '-5%' -- this half passed. The check's overall status is 'failed' because the subsequent non-TfL-shop assertion in the same flow caught a real bug (see bugs[])."
+    },
+    {
+      "criterion": "Switching session location updates the hero without a page reload (Zone 6 fixture shop)",
+      "name": "appraise-caption-zone-labels-and-live-switch",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck-zone6-caption-shop-<ts> (zone=6, -25% per GET /shops/preview-adjustment) via the authenticated page context; switching appraisal-location-select to it updated result-value-hero to contain 'Zone 6', '-25%' and \u00a37.00 (round(9*0.75)=6.75->7) within the toPass 2s window, and window.__tscheck_loaded_once stayed true proving no reload; price-option-charity tile also mirrored \u00a37.00."
+    },
+    {
+      "criterion": "Peak/Custom caption still unchanged; ZoneAdjustmentHint hidden in both",
+      "name": "appraise-caption-zone-labels-and-live-switch",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Selecting price-option-peak set the hero caption to 'Peak RRP \u2014 top of market' with zone-adjustment-hint hidden; typing \u00a317.00 into custom-price-input set the caption to 'Volunteer-set price' with the hint still hidden."
+    },
+    {
+      "criterion": "Charity Price hero/tile math unchanged (regression) and Peak/Custom save as-entered",
+      "name": "appraise-charity-peak-custom-price-math",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check unchanged: Askew Road Zone-2 charity tile+hero+saved success-moment all \u00a39.00 (10*0.9->9, 9*0.95->9); Peak saved \u00a335.00 verbatim; Custom saved \u00a317.00 verbatim; zone-adjustment-hint hidden for peak/custom. All 3 created items cleaned up via API."
+    },
+    {
+      "criterion": "Backend contract unchanged: POST /inventory with price_source charity still zone-adjusts; peak/custom save as entered",
+      "name": "test_tscheck_price_source_contract.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "pytest tests/test_tscheck_price_source_contract.py -> 3 passed in 1.79s against the live server (charity base=20 at Askew Road -> recommended_price=19 with ledger adjustment_percent=-5; peak/custom at the same shop -> recommended_price=20 verbatim with adjustment_percent=0; decimal peak=35.0/custom=17.0 saved exactly)."
+    },
+    {
+      "criterion": "No regression: backend full suite stays at its iteration-45/46 baseline",
+      "name": "pytest full suite",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "cd /app/backend && python -m pytest -q -p no:cacheprovider -> 101 passed, 5 failed (same 5 as prior iterations: test_shops_seeded_with_14_known_branches seeded-data mismatch; test_ai_quota_indexes & test_ai_quota_daily 'Event loop is closed' xdist teardown flakiness; 2 real-image appraise tests missing /tmp/item.jpg fixture). No new failures introduced."
+    }
+  ],
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "Charity Price hero caption names the shop's TfL zone -- non-TfL shop must drop the Zone part or show 'Outside TfL 0%'",
+      "description": "Switching the Appraise session location to a shop with outside_zones=true (zone:null, GET /shops/preview-adjustment returns zone:\"outside\", adjustment_percent:0) renders the hero caption as 'Zone outside 0%' instead of dropping the zone clause or showing 'Outside TfL 0%'. Root cause in frontend/src/pages/Appraise.tsx's inline caption builder: `const zoneLabel = z.zone ? \\`Zone ${z.zone}\\` : \"Outside TfL\";` treats the backend's zone:\"outside\" string as truthy (non-null, non-empty) so it never falls through to the \"Outside TfL\" branch; it only works correctly when zone is actually null.",
+      "evidence": "Browser check appraise-caption-zone-labels-and-live-switch, screenshot outside-tfl-caption.png: result-value-hero textContent = 'Estimated value\u00a39.00Very good condition \u00b7 90% of guide \u00b7 Zone outside 0% \u00b7 rounded'. Cross-checked backend health: curl -b cookies -G --data-urlencode shop_name=<outside-zones fixture shop> --data-urlencode base_price=9 http://localhost:8001/api/shops/preview-adjustment -> {\"base_price\":9.0,\"adjusted_price\":9.0,\"adjustment_percent\":0.0,\"zone\":\"outside\",...} confirming the backend is healthy and correctly returning zone:\"outside\"; the bug is purely in how Appraise.tsx's caption interpolates that string."
+    }
+  ],
+  "action_items": [
+    "Fix Appraise.tsx's inline Charity-Price caption to special-case zone === \"outside\" (not just zone === null) so a non-TfL shop caption drops the Zone clause or reads 'Outside TfL 0%' per the acceptance criterion, instead of 'Zone outside 0%'.",
+    "Pre-existing, out-of-scope (reconfirmed again, not introduced by this iteration): test_tscheck_shops_seeded_data.py seeded-zone mismatch on Chiswick High Road; test_tscheck_ai_quota_indexes.py / test_tscheck_ai_quota_daily.py 'Event loop is closed' under pytest-xdist teardown; test_tscheck_appraise_robustness_and_gating.py / test_tscheck_appraise_endpoint.py missing /tmp/item.jpg fixture for real-AI appraise calls."
+  ]
+}
