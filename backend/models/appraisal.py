@@ -41,20 +41,25 @@ class AppraiseRequest(BaseModel):
 
 
 class Appraisal(BaseModel):
-    title: str
-    brand: str
-    category: str
-    description: str
-    condition: str
+    # Server-side length caps on every free-text field. The frontend already truncates AI output
+    # (title/brand to 80 chars, description/blurb to 1500) but a volunteer with a scripted client
+    # could otherwise persist multi-megabyte strings — the shared inventory list endpoint ships
+    # these fields to every user, so uncapped text becomes a shared-availability hit for the
+    # whole shop (SEC-001, security audit 2026-10-26).
+    title: str = Field(..., max_length=80)
+    brand: str = Field(..., max_length=80)
+    category: str = Field(..., max_length=80)
+    description: str = Field(..., max_length=1500)
+    condition: str = Field(..., max_length=32)
     is_electrical: bool = False  # AI-flagged electrical item needing a PAT test before resale
-    price_source: str = "charity"  # how the tag price was chosen: "charity" | "peak" | "custom"
+    price_source: str = Field(default="charity", max_length=16)  # "charity" | "peak" | "custom"
     peak_retail_price: float
     market_average_price: float
     recommended_price: float
-    currency: str = "GBP"
-    confidence: str
-    rationale: str
-    resale_blurb: str = ""  # Gemini-drafted eBay/Vinted listing description
+    currency: str = Field(default="GBP", max_length=8)
+    confidence: str = Field(..., max_length=32)
+    rationale: str = Field(..., max_length=1500)
+    resale_blurb: str = Field(default="", max_length=1500)  # Gemini-drafted listing description
 
 
 class InventoryCreate(BaseModel):
@@ -62,8 +67,10 @@ class InventoryCreate(BaseModel):
     item_image: str | None = None
     label_image: str | None = None
     extra_images: list[str] = []
-    giftaid_ref: str | None = None
-    location: str | None = None
+    # Gift Aid reference is a short alphanumeric code — cap it so a scripted client cannot stash
+    # multi-megabyte strings on every item (SEC-001 hardening).
+    giftaid_ref: str | None = Field(default=None, max_length=64)
+    location: str | None = Field(default=None, max_length=80)
     size: str | None = Field(default=None, max_length=40)
 
     @model_validator(mode="after")

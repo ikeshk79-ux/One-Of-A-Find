@@ -144,7 +144,11 @@ async def create_item(body: InventoryCreate, session: dict = Depends(require_ses
     # clamp the peak/market numbers the client sends — the AI returns 2-3 figure GBP values, so
     # £100k is a safe cosmetic ceiling that catches a non-UI client from skewing dashboards.
     _PRICE_CEILING = 100_000.0
-    appraisal["recommended_price"] = round(max(0.0, float(appraisal.get("recommended_price") or 0)), 2)
+    # Clamp all three prices to [0, _PRICE_CEILING] so a scripted client can't skew dashboard
+    # totals by storing an absurdly large recommended_price (SEC-002 hardening, 2026-10-26).
+    appraisal["recommended_price"] = round(
+        max(0.0, min(_PRICE_CEILING, float(appraisal.get("recommended_price") or 0))), 2
+    )
     appraisal["peak_retail_price"] = round(
         max(0.0, min(_PRICE_CEILING, float(appraisal.get("peak_retail_price") or 0))), 2
     )
@@ -272,6 +276,8 @@ async def update_item(item_id: str, body: ItemUpdate, session: dict = Depends(re
     if body.recommended_price is not None:
         if body.recommended_price < 0:
             raise HTTPException(status_code=422, detail="Price cannot be negative")
+        if body.recommended_price > 100_000:
+            raise HTTPException(status_code=422, detail="Price exceeds limit")
         update["recommended_price"] = round(float(body.recommended_price), 2)
     if body.size is not None:
         update["size"] = body.size.strip()[:40] or None  # empty string clears the size
