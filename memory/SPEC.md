@@ -143,8 +143,12 @@ keeps the base's existing 50p rounding per spec). It returns both the final pric
 metadata needed for the audit row.
 
 **Inventory hooks**:
-- `POST /inventory` adjusts the recommended price via the shop's zone before persisting and
-  writes a `pricing_ledger` row (reason="create") with base/adjustment/final/zone/rule_version.
+- `POST /inventory` adjusts the recommended price via the shop's zone **only when
+  `price_source == "charity"`** — Peak RRP and custom-typed prices are saved exactly as
+  entered, so the hero price on the valuation screen always matches what lands on the tag.
+  Non-charity creates still write a `pricing_ledger` row (reason="create") with
+  `adjustment_percent=0` and `base_price == final_price`, so the ledger still records the
+  shop + rule-version it was priced under.
 - `PATCH /inventory/{id}` recomputes the price when the location changes **and** the item's
   price_source after the patch is "charity" **and** the volunteer isn't manually overriding
   the price in the same call. Uses the most recent ledger row's `base_price` as the starting
@@ -160,8 +164,11 @@ on the same page edits the seven percentage cells and bumps the version on save.
 exposed from `More` via the "Shops & pricing" tile for the master only.
 
 **Appraise form**: a one-line `ZoneAdjustmentHint` under the shop-location dropdown previews
-the zone-adjusted price via `GET /shops/preview-adjustment`. Advisory only — the backend
-recomputes canonically on save.
+the zone-adjusted price via `GET /shops/preview-adjustment` (only shown when the volunteer
+has the Charity Price option selected — Peak/custom bypass zone adjustment). The hero
+"Estimated value" and the Charity Price tile both display the zone-adjusted result from
+the same endpoint so the on-screen number is exactly what gets saved. Peak and custom tiles
+display their raw values unchanged.
 
 **Frontend hooks**: `src/hooks/useShops.ts` exposes `useShops`, `useShopNames` (string[] for
 dropdowns, falls back to the static LOCATIONS tuple while loading), and `usePricingRules`.

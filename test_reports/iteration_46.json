@@ -1,0 +1,80 @@
+{
+  "iteration": 46,
+  "mode": "retest",
+  "summary": "Retest of POST /inventory + Appraise.tsx charity/peak/custom price math (zone-adjusted charity, as-entered peak/custom, ZoneAdjustmentHint visibility). New backend test file (3 tests) + 1 new browser check covering all 4 UI/API pricing criteria, plus 4 re-run regression artifacts (tag design, print-tags PDF, scanner re-arm, admin audit CSV). All 9 checks passed. Backend full-suite has 5 pre-existing failures unrelated to this change (event-loop-closed xdist teardown flakiness on ai_quota tests, a seeded-data mismatch on Chiswick High Road needs_zone_review, and 2 real-AI appraise tests failing on a missing /tmp/item.jpg fixture) — all previously classified as out-of-scope/environment in iteration 45 and reconfirmed here on isolated rerun.",
+  "passed": 9,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Charity Price hero + tile on the Appraise valuation screen match what gets saved (zone-adjusted)",
+      "name": "appraise-charity-peak-custom-price-math",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Mocked POST /api/appraise to return recommended_price(guide)=10, peak=35; set condition 'Very good' (0.9x -> 9) at Askew Road (Zone 2, -5%): charityPricePreZone=9, preview-adjustment rounds 9*0.95=8.55->9, so both price-option-charity tile and result-value-hero showed £9.00; after Save, success-moment also showed £9.00. Cleaned up all 3 created items via API after assertions."
+    },
+    {
+      "criterion": "Peak RRP save is honoured as-entered (no silent zone adjustment)",
+      "name": "appraise-charity-peak-custom-price-math",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Selected price-option-peak (£35.00) at the same Zone-2 shop; hero read £35.00, zone-adjustment-hint hidden (basePrice=0), success-moment after save showed £35.00 verbatim."
+    },
+    {
+      "criterion": "Custom price save is honoured as-entered (no silent zone adjustment)",
+      "name": "appraise-charity-peak-custom-price-math",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Typed £17.00 into custom-price-input; price-option-custom-selected shown, hero read £17.00, zone-adjustment-hint hidden, success-moment after save showed £17.00 verbatim."
+    },
+    {
+      "criterion": "ZoneAdjustmentHint only shows when Charity Price is the active choice and reflects the condition-adjusted base",
+      "name": "appraise-charity-peak-custom-price-math",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "With Charity selected, zone-adjustment-hint visible and read 'Zone 2 ... -5% applied -- GBP9.00 -> GBP9.00' matching the charity tile; after switching to Peak and to Custom in the follow-on flows, the hint was toBeHidden (basePrice=0 -> component renders null) in both cases."
+    },
+    {
+      "criterion": "Backend contract: POST /inventory with price_source peak/custom never changes recommended_price via zone adjustment",
+      "name": "test_tscheck_price_source_contract.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "3 pytest cases against live server: (1) charity base=20 at Askew Road (Zone2,-5%) -> POST /inventory 201, recommended_price=19, ledger reason=create/base_price=20/adjustment_percent=-5/final_price=19/zone=2; (2) peak & custom with the same base=20 at the same shop -> both 201 with recommended_price=20 verbatim, ledger adjustment_percent=0 and base_price==final_price==20 for each; (3) peak=35.0 and custom=17.0 decimal payloads saved exactly as 35.0/17.0. All fixtures deleted via DELETE /inventory/{id} in finally blocks."
+    },
+    {
+      "criterion": "No regressions: tag redesign (no QR, sticker outline, charity line, CONDITION/PRICE/RRP layout)",
+      "name": "tag-page-new-design-no-qr",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-ran persisted check: no QR rendered on /tag/{id}, sticker outline + 'All proceeds go to charity' copy present."
+    },
+    {
+      "criterion": "No regressions: print-tags PDF content (CONDITION:/PRICE/RRP, no QR, charity line)",
+      "name": "print-tags-a6-new-design-pdf-and-dom",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "PDF text extracted: 'CONDITION: Good PRICE £15.00 RRP £80.00 All proceeds go to charity' for both A6 tiles, no QR."
+    },
+    {
+      "criterion": "No regressions: scanner re-arm after a non-matching decode",
+      "name": "scanner-rearms-after-nonmatch-decode",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Bogus decode -> 'No item matches that barcode' toast, dialog stayed open; next decode (seeded SKU) fired onDetected again and navigated to /tag/{id}. Only console error was the expected 404 from the bogus lookup."
+    },
+    {
+      "criterion": "No regressions: admin audit CSV export",
+      "name": "admin-audit-csv-export-downloads",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Clicked admin-audit-csv as master; download event fired with suggestedFilename matching pricing-audit-*.csv, no console error."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, out-of-scope (reconfirmed on isolated rerun, not introduced by this iteration): test_tscheck_shops_seeded_data.py::test_shops_seeded_with_14_known_branches fails (Chiswick High Road needs_zone_review expected True, got False) — seeded-data mismatch. test_tscheck_ai_quota_indexes.py and test_tscheck_ai_quota_daily_rollback_burst.py fail with 'Event loop is closed' under pytest-xdist teardown (environment/test-harness issue, not app logic). test_tscheck_appraise_robustness_and_gating.py and test_tscheck_appraise_endpoint.py (real-image appraise calls) fail because the shared fixture image /tmp/item.jpg is missing in this environment -- not a regression from this iteration's change."
+  ]
+}

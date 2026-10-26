@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, Camera, Check, Copy, Loader2, Plus, Save, Sparkles, Tag as TagIcon, X } from "lucide-react";
 import { toast } from "sonner";
@@ -27,13 +27,13 @@ import SuccessMoment from "@/components/common/SuccessMoment";
 import ValueDisplay from "@/components/common/ValueDisplay";
 import ConfidenceBadge from "@/components/common/ConfidenceBadge";
 import WhyThisEstimate from "@/components/common/WhyThisEstimate";
-import { ApiError, apiPost } from "@/lib/api";
+import { ApiError, apiGet, apiPost } from "@/lib/api";
 import { gbp, CATEGORIES, sizeOptionsFor, CONDITION_OPTIONS, CONDITION_MULTIPLIERS, adjustedCharityPrice } from "@/lib/types";
+import type { Appraisal, InventoryItem, PriceAdjustmentPreview } from "@/lib/types";
 import { useShopNames } from "@/hooks/useShops";
 import ZoneAdjustmentHint from "@/components/common/ZoneAdjustmentHint";
 import { getSessionLocation, useSessionLocation } from "@/lib/sessionLocation";
 import FirstRunGuide from "@/components/FirstRunGuide";
-import type { Appraisal, InventoryItem } from "@/lib/types";
 
 function CameraSlot({
   label,
@@ -221,8 +221,26 @@ export default function Appraise() {
   // A bespoke price the volunteer typed; used when the "Set my own price" panel is chosen.
   const customValue = Number.parseFloat(customPrice);
   const hasCustomValue = Number.isFinite(customValue) && customValue >= 0;
-  // The charity price reflects the volunteer-chosen condition: base price × grade multiplier, 50p-rounded.
-  const charityPrice = result ? adjustedCharityPrice(result.recommended_price, condition) : 0;
+  // Pre-zone charity price: base guide × condition multiplier, rounded to 50p. This is the
+  // input the backend's zone adjustment runs on. Shown as a brief fallback until the live
+  // preview-adjustment query resolves (and whenever no shop is picked yet).
+  const charityPricePreZone = result ? adjustedCharityPrice(result.recommended_price, condition) : 0;
+  // Zone-adjusted charity price: fetched from the same backend endpoint that will run on save,
+  // so what the volunteer sees on the hero/charity tile is exactly what lands on the tag. For
+  // "peak" and "custom" the backend intentionally bypasses the zone adjustment — those save
+  // as-entered, so we don't adjust them here either.
+  const zoneQ = useQuery<PriceAdjustmentPreview>({
+    queryKey: ["shops", "preview-adjustment", location, charityPricePreZone],
+    enabled: Boolean(location) && charityPricePreZone > 0,
+    queryFn: () =>
+      apiGet<PriceAdjustmentPreview>(
+        `/shops/preview-adjustment?base_price=${encodeURIComponent(
+          String(charityPricePreZone),
+        )}&shop_name=${encodeURIComponent(location ?? "")}`,
+      ),
+    staleTime: 30_000,
+  });
+  const charityPrice = zoneQ.data?.adjusted_price ?? charityPricePreZone;
   // The volunteer taps one of the price panels; that value becomes the item's tag price.
   const chosenPrice = result
     ? priceChoice === "peak"
@@ -892,7 +910,7 @@ export default function Appraise() {
               </Select>
               <ZoneAdjustmentHint
                 location={location}
-                basePrice={result?.recommended_price ?? 0}
+                basePrice={priceChoice === "charity" ? charityPricePreZone : 0}
               />
             </div>
 

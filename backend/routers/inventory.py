@@ -162,12 +162,31 @@ async def create_item(body: InventoryCreate, session: dict = Depends(require_ses
     if body.location is not None and body.location not in active_shops:
         raise HTTPException(status_code=422, detail="Unknown location")
 
-    # Apply the TfL-zone adjustment on the backend before persisting so the stored
-    # recommended_price always reflects the current pricing rules — the frontend's preview
-    # is advisory only.
+    # Apply the TfL-zone adjustment on the backend before persisting ONLY when the volunteer
+    # chose the Charity Price option. For "peak" (RRP) and "custom" the volunteer explicitly set
+    # the price — honour it as-sent so the hero number on the valuation screen matches what
+    # lands on the tag. The frontend applies the same zone adjustment to the Charity Price
+    # before posting, so for `price_source == "charity"` this call is idempotent (base ≈ final)
+    # on normal input; running it here is the authoritative belt-and-braces against a client
+    # that didn't pre-adjust.
     base_price = appraisal["recommended_price"]
-    adjustment = await apply_adjustment(base_price, shop_name=body.location)
-    appraisal["recommended_price"] = adjustment["final_price"]
+    if appraisal["price_source"] == "charity":
+        adjustment = await apply_adjustment(base_price, shop_name=body.location)
+        appraisal["recommended_price"] = adjustment["final_price"]
+    else:
+        # Non-charity price — bypass the zone adjustment; audit it as a 0% adjustment so the
+        # ledger still records the sale location + rule version it was priced under.
+        from lib.pricing import load_rules  # local import to avoid a cycle at module load
+        rules = await load_rules()
+        adjustment = {
+            "base_price": base_price,
+            "final_price": base_price,
+            "adjustment_percent": 0.0,
+            "zone": None,
+            "rule_version": rules.version,
+            "shop_id": None,
+            "shop_name": body.location,
+        }
 
     item = InventoryItem(
         sku=await _unique_sku(),
